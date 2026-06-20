@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #aa3bff;
+  --color-bg-light: #ffffff;
+  --color-text-light: #08060d;
+  --color-bg-dark: #16171d;
+  --color-text-dark: #f3f4f6;
+  --color-bg-eye: #f4f1e1;
+  --color-text-eye: #3b352b;
+}
+
+@layer base {
+  :root {
+    --bg: var(--color-bg-light);
+    --text: var(--color-text-light);
+  }
+
+  .dark {
+    --bg: var(--color-bg-dark);
+    --text: var(--color-text-dark);
+  }
+
+  .eye-comfort {
+    --bg: var(--color-bg-eye);
+    --text: var(--color-text-eye);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    transition: background-color 0.2s, color 0.2s;
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  #print-area, #print-area * {
+    visibility: visible;
+  }
+  
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
