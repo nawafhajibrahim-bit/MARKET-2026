@@ -34,7 +34,7 @@ export const initDB = async () => {
         const db = await createRxDatabase({
             name: dbName,
             storage,
-            ignoreDuplicate: true // Important for React Strict Mode
+            ignoreDuplicate: import.meta.env.DEV // Allowed in dev-mode for React Strict Mode, disabled in production
         });
 
         // Add collections
@@ -70,7 +70,7 @@ export const initDB = async () => {
         const db = await createRxDatabase({
             name: dbName,
             storage,
-            ignoreDuplicate: true
+            ignoreDuplicate: import.meta.env.DEV
         });
 
         await db.addCollections({
