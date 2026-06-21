@@ -36,6 +36,16 @@ export const Inventory = () => {
   // Multi-unit configuration state
   const [additionalUnits, setAdditionalUnits] = useState<AdditionalUnit[]>([]);
 
+  // Notification Toast State
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+
+  const triggerNotification = (msg: string, type: 'success' | 'error' = 'success') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(null), 3000);
+  };
+
   const handleBarcodeChange = async (val: string) => {
     setBarcode(val);
     if (val && !editProductId) {
@@ -148,7 +158,55 @@ export const Inventory = () => {
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nameAr || costPrice <= 0 || salePrice <= 0) return;
+    
+    // Detailed input validation
+    if (!nameAr.trim()) {
+      triggerNotification(
+        i18n.language === 'ar' ? 'الاسم بالعربية مطلوب!' : 'Arabic name is required!',
+        'error'
+      );
+      return;
+    }
+
+    if (Number(costPrice) <= 0) {
+      triggerNotification(
+        i18n.language === 'ar' ? 'سعر التكلفة يجب أن يكون أكبر من صفر!' : 'Cost price must be greater than zero!',
+        'error'
+      );
+      return;
+    }
+
+    if (Number(salePrice) <= 0) {
+      triggerNotification(
+        i18n.language === 'ar' ? 'سعر البيع يجب أن يكون أكبر من صفر!' : 'Sale price must be greater than zero!',
+        'error'
+      );
+      return;
+    }
+
+    for (const unit of additionalUnits) {
+      if (!unit.unit_name.trim()) {
+        triggerNotification(
+          i18n.language === 'ar' ? 'اسم الوحدة الإضافية مطلوب!' : 'Additional unit name is required!',
+          'error'
+        );
+        return;
+      }
+      if (Number(unit.conversion_factor) <= 0) {
+        triggerNotification(
+          i18n.language === 'ar' ? 'معامل التحويل يجب أن يكون أكبر من صفر!' : 'Conversion factor must be greater than zero!',
+          'error'
+        );
+        return;
+      }
+      if (Number(unit.price_per_unit) <= 0) {
+        triggerNotification(
+          i18n.language === 'ar' ? 'سعر بيع الوحدة يجب أن يكون أكبر من صفر!' : 'Unit sale price must be greater than zero!',
+          'error'
+        );
+        return;
+      }
+    }
 
     try {
       if (editProductId) {
@@ -177,7 +235,7 @@ export const Inventory = () => {
 
           for (const unit of additionalUnits) {
             if (unit.unit_name && unit.conversion_factor > 0 && unit.price_per_unit > 0) {
-              const unitId = 'unit-' + Math.random().toString(36).substring(2, 9);
+              const unitId = 'unit-' + crypto.randomUUID();
               await db.units.insert({
                 unit_id: unitId,
                 product_id: editProductId,
@@ -190,7 +248,7 @@ export const Inventory = () => {
         }
       } else {
         // Insert mode
-        const productId = 'prod-' + Math.random().toString(36).substring(2, 9);
+        const productId = 'prod-' + crypto.randomUUID();
         await db.products.insert({
           id: productId,
           barcode: barcode || productId,
@@ -206,7 +264,7 @@ export const Inventory = () => {
 
         for (const unit of additionalUnits) {
           if (unit.unit_name && unit.conversion_factor > 0 && unit.price_per_unit > 0) {
-            const unitId = 'unit-' + Math.random().toString(36).substring(2, 9);
+            const unitId = 'unit-' + crypto.randomUUID();
             await db.units.insert({
               unit_id: unitId,
               product_id: productId,
@@ -231,8 +289,17 @@ export const Inventory = () => {
       setAdditionalUnits([]);
       setEditProductId(null);
       setShowModal(false);
+
+      triggerNotification(
+        i18n.language === 'ar' ? 'تم حفظ المنتج بنجاح!' : 'Product saved successfully!',
+        'success'
+      );
     } catch (err) {
       console.error('Failed to save product:', err);
+      triggerNotification(
+        i18n.language === 'ar' ? 'فشل حفظ المنتج!' : 'Failed to save product!',
+        'error'
+      );
     }
   };
 
@@ -246,8 +313,17 @@ export const Inventory = () => {
       for (const u of associatedUnits) {
         await u.remove();
       }
+
+      triggerNotification(
+        i18n.language === 'ar' ? 'تم حذف المنتج بنجاح!' : 'Product deleted successfully!',
+        'success'
+      );
     } catch (err) {
       console.error('Failed to delete product:', err);
+      triggerNotification(
+        i18n.language === 'ar' ? 'فشل حذف المنتج!' : 'Failed to delete product!',
+        'error'
+      );
     } finally {
       setDeleteConfirmId(null);
     }
@@ -280,7 +356,7 @@ export const Inventory = () => {
       p.sku_serial || '',
       p.name_ar,
       p.name_en || '',
-      p.category || '',
+      (p.category === 'General' || p.category === 'general') ? t('general') : (p.category || ''),
       p.cost_price,
       p.sale_price,
       p.stock_quantity
@@ -296,9 +372,9 @@ export const Inventory = () => {
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `products_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -378,7 +454,7 @@ export const Inventory = () => {
                         )}
                       </div>
                     </td>
-                    <td className="p-4 text-gray-500 text-sm">{p.category}</td>
+                     <td className="p-4 text-gray-500 text-sm">{(p.category === 'General' || p.category === 'general') ? t('general') : p.category}</td>
                     <td className="p-4 font-mono text-sm" dir="ltr">
                       {formatCurrency(p.sale_price)}
                     </td>
@@ -648,6 +724,15 @@ export const Inventory = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Toast Notification */}
+      {message && (
+        <div className={`fixed bottom-4 left-4 right-4 md:left-auto md:w-96 text-white p-4 rounded-xl shadow-lg z-[300] flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300 ${
+          messageType === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`}>
+          <span>{messageType === 'success' ? '✅' : '⚠️'}</span>
+          <span>{message}</span>
         </div>
       )}
     </div>

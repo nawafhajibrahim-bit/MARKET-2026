@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 type LicenseRecord = {
     merchant_name?: string;
     expiry_date: string;
@@ -21,6 +23,12 @@ type ApiResponse = {
     };
 };
 
+function safeCompare(a: string, b: string): boolean {
+    const aHash = crypto.createHash('sha256').update(a).digest();
+    const bHash = crypto.createHash('sha256').update(b).digest();
+    return crypto.timingSafeEqual(aHash, bHash);
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -34,7 +42,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const REPO_NAME = process.env.GITHUB_REPO_NAME;
     const FILE_PATH = 'licenses.json';
 
-    if (!ADMIN_SECRET || admin_secret !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !admin_secret || !safeCompare(admin_secret, ADMIN_SECRET)) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -57,7 +65,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         let licenses: Record<string, LicenseRecord> = {};
 
         if (getRes.ok) {
-            const data = await getRes.json();
+            const data = (await getRes.json()) as any;
             fileSha = data.sha;
             const content = Buffer.from(data.content, 'base64').toString('utf-8');
             licenses = JSON.parse(content) as Record<string, LicenseRecord>;

@@ -45,14 +45,46 @@ export default function AIEngine() {
         const data = await res.json();
         return data.choices?.[0]?.message?.content || t('ai_no_response');
       } else {
-        // Since we are running locally without a proxy, we must require the custom key.
-        return t('custom_key_required') || 'Please enter your Groq API Key in Settings to use the AI features.';
+        // Call our Vercel serverless proxy with the local license key
+        let licenseKey = '';
+        try {
+          const configDoc = await db.system_config.findOne('config').exec();
+          if (configDoc) {
+            licenseKey = configDoc.get('license_key') || '';
+          }
+        } catch (dbErr) {
+          console.error('Error fetching license key from DB:', dbErr);
+        }
+
+        if (!licenseKey) {
+          return t('license_required') || 'A valid license key is required to use AI features.';
+        }
+
+        const res = await fetch('/api/ai-chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            prompt,
+            model: selectedModel,
+            licenseKey
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          return errData.error || t('ai_error_connect');
+        }
+
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || t('ai_no_response');
       }
     } catch (e) {
       console.error(e);
       return t('ai_error_connect');
     }
-  }, [t]);
+  }, [t, db]);
 
   const getDatabaseContext = useCallback(async () => {
     try {
@@ -104,13 +136,6 @@ ${debtsSummary}
     const dbContext = await getDatabaseContext();
     if (!dbContext) {
       setInsight(t('no_insights'));
-      setLoading(false);
-      return;
-    }
-
-    const customKey = localStorage.getItem('custom_groq_key') || '';
-    if (!customKey) {
-      setInsight(t('custom_key_required') || 'Please enter your Groq API Key in Settings to use the AI features.');
       setLoading(false);
       return;
     }

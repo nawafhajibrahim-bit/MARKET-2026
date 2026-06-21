@@ -179,7 +179,7 @@ export const SalesHistory = () => {
       const refundTotal = returnItems.reduce((sum, ri) => sum + (ri.price * ri.quantity), 0);
 
       // Create negative invoice record
-      const returnInvoiceId = 'ret-' + Math.random().toString(36).substring(2, 9);
+      const returnInvoiceId = 'ret-' + crypto.randomUUID();
       await db.invoices.insert({
         invoice_id: returnInvoiceId,
         timestamp: new Date().toISOString(),
@@ -275,6 +275,7 @@ export const SalesHistory = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (

@@ -217,6 +217,7 @@
   "discount_amount": "Discount Amount",
   "enable_discount": "Enable Discount",
   "quantity_exceeds_stock": "Quantity exceeds available stock",
+  "general": "General",
   "error_occurred": "An unexpected error occurred",
   "reload_app": "Reload Application",
   "error_description": "Please reload the app. If the problem persists, contact support."

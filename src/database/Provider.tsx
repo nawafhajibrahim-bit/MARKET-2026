@@ -58,7 +58,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-                <span className="ml-4 text-lg">Initializing Database...</span>
+                <span className="mx-4 text-lg font-semibold text-gray-600 dark:text-gray-300">Initializing Database... / جاري تهيئة قاعدة البيانات...</span>
             </div>
         );
     }

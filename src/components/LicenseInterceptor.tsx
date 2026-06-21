@@ -145,8 +145,11 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
 
       } catch (err) {
         console.error('License check failed:', err);
-        // Fail-safe to avoid blocking user if local DB fails
-        if (isMounted) setIsAuthorized(true);
+        // Fail-closed to protect the application
+        if (isMounted) {
+          setErrorMsg(t('license_error') || 'License database error.');
+          setIsAuthorized(false);
+        }
       }
     };
 
@@ -177,8 +180,8 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           const tokenPayload = JSON.stringify({ license_key: licenseKey, hw_fingerprint: hwFingerprint });
           const activationToken = await encryptData(tokenPayload, hwFingerprint);
 
-          // If offline or testing, allow 'TEST-LICENSE' bypass
-          if (licenseKey === DEMO_LICENSE_KEY || licenseKey === 'TEST') {
+          // If offline or testing, allow 'TEST-LICENSE' bypass only if demo login is enabled
+          if (isDemoLoginEnabled && (licenseKey === DEMO_LICENSE_KEY || licenseKey === 'TEST')) {
               await db.system_config.insert({
                   id: 'config',
                   license_key: licenseKey,

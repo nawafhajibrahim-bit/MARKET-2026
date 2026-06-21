@@ -49,7 +49,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             return res.status(500).json({ error: 'Failed to fetch licenses from GitHub' });
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as any;
         // GitHub API returns content as base64
         const content = Buffer.from(data.content, 'base64').toString('utf-8');
         const licenses = JSON.parse(content) as Record<string, LicenseRecord>;

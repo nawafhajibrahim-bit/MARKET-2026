@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList } from '../utils/currency';
 import { Receipt } from '../components/Receipt';
+import { useCart } from '../hooks/useCart';
 
 interface CartItem {
   product: ProductDocType;
@@ -29,14 +30,41 @@ export const POS = () => {
   const [products, setProducts] = useState<ProductDocType[]>([]);
   const [unitsMap, setUnitsMap] = useState<Record<string, UnitDocType[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 200);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
   
   // Cart & Checkout State
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentType, setPaymentType] = useState<'cash' | 'debt'>('cash');
   const [clientName, setClientName] = useState('');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+
+  const triggerNotification = (text: string, type: 'success' | 'error') => {
+    setMessage(text);
+    setMessageType(type);
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const {
+    cart,
+    handleAddToCart,
+    handleRemoveFromCart,
+    handleQuantityChange,
+    handleUnitChangeInCart,
+    calculateCartTotal,
+    clearCart
+  } = useCart(unitsMap, triggerNotification, t);
 
   // Completed Sale & Print Preview State
   const [completedInvoice, setCompletedInvoice] = useState<CompletedInvoice | null>(null);
@@ -109,106 +137,7 @@ export const POS = () => {
     };
   }, [db]);
 
-  const getProductQtyInCart = (productId: string, excludeIndex?: number) => {
-    return cart.reduce((sum, item, idx) => {
-      if (item.product.id !== productId || idx === excludeIndex) return sum;
-      const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;
-      return sum + (item.quantity * factor);
-    }, 0);
-  };
 
-  const handleAddToCart = (product: ProductDocType) => {
-    // Check if product has stock
-    if (product.stock_quantity <= 0) {
-      triggerNotification(t('sale_failed') + ' (Out of stock)', 'error');
-      return;
-    }
-
-    const existingIndex = cart.findIndex(item => item.product.id === product.id && item.selectedUnit === null);
-    
-    // Calculate total base quantity of this product in cart if we add 1 piece
-    const currentBaseQty = getProductQtyInCart(product.id);
-    const newBaseQty = currentBaseQty + 1; // since adding 1 piece (base unit factor is 1)
-
-    if (newBaseQty > product.stock_quantity) {
-      triggerNotification(t('quantity_exceeds_stock'), 'error');
-      return;
-    }
-
-    if (existingIndex > -1) {
-      const updated = [...cart];
-      updated[existingIndex].quantity += 1;
-      setCart(updated);
-    } else {
-      setCart([...cart, { product, selectedUnit: null, quantity: 1 }]);
-    }
-  };
-
-  const handleRemoveFromCart = (index: number) => {
-    setCart(cart.filter((_, i) => i !== index));
-  };
-
-  const handleQuantityChange = (index: number, change: number) => {
-    const updated = [...cart];
-    const item = updated[index];
-    const newQty = item.quantity + change;
-    if (newQty > 0) {
-      // Check stock limit when increasing quantity
-      if (change > 0) {
-        const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;
-        const currentOtherBaseQty = getProductQtyInCart(item.product.id, index);
-        const newTotalBaseQty = currentOtherBaseQty + (newQty * factor);
-
-        if (newTotalBaseQty > item.product.stock_quantity) {
-          triggerNotification(t('quantity_exceeds_stock'), 'error');
-          return;
-        }
-      }
-      item.quantity = newQty;
-      setCart(updated);
-    }
-  };
-
-  const handleUnitChangeInCart = (index: number, unitId: string) => {
-    const updated = [...cart];
-    const item = updated[index];
-    const prodUnits = unitsMap[item.product.id] || [];
-    
-    let targetUnit = null;
-    if (unitId !== 'base') {
-      const foundUnit = prodUnits.find(u => u.unit_id === unitId);
-      if (foundUnit) {
-        targetUnit = foundUnit;
-      }
-    }
-
-    // Check stock limit for the new unit
-    const factor = targetUnit ? targetUnit.conversion_factor : 1;
-    const currentOtherBaseQty = getProductQtyInCart(item.product.id, index);
-    const newTotalBaseQty = currentOtherBaseQty + (item.quantity * factor);
-
-    if (newTotalBaseQty > item.product.stock_quantity) {
-      triggerNotification(t('quantity_exceeds_stock'), 'error');
-      return; // prevent unit change
-    }
-
-    item.selectedUnit = targetUnit;
-    setCart(updated);
-  };
-
-  const triggerNotification = (text: string, type: 'success' | 'error') => {
-    setMessage(text);
-    setMessageType(type);
-    setTimeout(() => setMessage(null), 4000);
-  };
-
-  // Calculations
-  const calculateCartTotal = () => {
-    return cart.reduce((sum, item) => {
-      const price = item.selectedUnit ? item.selectedUnit.price_per_unit : item.product.sale_price;
-      return sum + (price * item.quantity);
-    }, 0);
-  };
 
   const calculateDiscountAmount = () => {
     if (!discountEnabled || discountValue <= 0) return 0;
@@ -245,39 +174,73 @@ export const POS = () => {
         price: number;
       }> = [];
 
-      // Loop to deduct stock and calculate profit
+      // 1. Group and check stock requirements
+      const stockRequirements: Record<string, { doc: any; totalDeduct: number; nameAr: string; nameEn: string; costPrice: number }> = {};
+      
       for (const item of cart) {
         const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;
         const baseQtyToDeduct = item.quantity * factor;
+        const prodId = item.product.id;
 
-        // Fetch product document to check stock & update
-        const pDoc = await db.products.findOne(item.product.id).exec();
-        if (!pDoc) {
-          throw new Error('Product not found: ' + item.product.name_ar);
+        if (!stockRequirements[prodId]) {
+          const pDoc = await db.products.findOne(prodId).exec();
+          if (!pDoc) {
+            triggerNotification(`Product not found: ${item.product.name_ar}`, 'error');
+            return;
+          }
+          const pData = pDoc.toJSON();
+          stockRequirements[prodId] = {
+            doc: pDoc,
+            totalDeduct: 0,
+            nameAr: pData.name_ar,
+            nameEn: pData.name_en,
+            costPrice: pData.cost_price
+          };
         }
+        stockRequirements[prodId].totalDeduct += baseQtyToDeduct;
+      }
 
-        const pData = pDoc.toJSON();
-        if (pData.stock_quantity < baseQtyToDeduct) {
-          triggerNotification(`${t('low_stock')}: ${i18n.language === 'ar' ? pData.name_ar : pData.name_en}`, 'error');
+      // Verify all stock demands before writing
+      for (const prodId in stockRequirements) {
+        const req = stockRequirements[prodId];
+        const currentStock = req.doc.toJSON().stock_quantity;
+        if (currentStock < req.totalDeduct) {
+          triggerNotification(`${t('low_stock')}: ${i18n.language === 'ar' ? req.nameAr : req.nameEn}`, 'error');
           return;
         }
+      }
 
-        // Deduct stock
-        const newStock = Math.max(0, pData.stock_quantity - baseQtyToDeduct);
-        await pDoc.incrementalPatch({ stock_quantity: newStock });
+      // Track running stock to avoid stale reads from the doc object during sequential updates of the same product
+      const runningStock: Record<string, number> = {};
+      for (const prodId in stockRequirements) {
+        runningStock[prodId] = stockRequirements[prodId].doc.toJSON().stock_quantity;
+      }
 
-        totalCostAmount += pData.cost_price * baseQtyToDeduct;
+      // 2. Perform updates and build invoice items
+      for (const item of cart) {
+        const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;
+        const baseQtyToDeduct = item.quantity * factor;
+        const prodId = item.product.id;
+        const req = stockRequirements[prodId];
+        
+        // Deduct from running stock
+        const currentStock = runningStock[prodId];
+        const newStock = Math.max(0, currentStock - baseQtyToDeduct);
+        await req.doc.incrementalPatch({ stock_quantity: newStock });
+        runningStock[prodId] = newStock;
+
+        totalCostAmount += req.costPrice * baseQtyToDeduct;
 
         invoiceItems.push({
-          product_id: item.product.id,
+          product_id: prodId,
           unit_used: item.selectedUnit ? item.selectedUnit.unit_name : 'piece',
           quantity: item.quantity,
-          price: item.selectedUnit ? item.selectedUnit.price_per_unit : pData.sale_price
+          price: item.selectedUnit ? item.selectedUnit.price_per_unit : req.doc.toJSON().sale_price
         });
       }
 
       const actualProfit = totalAmount - totalCostAmount;
-      const invoiceId = 'inv-' + Math.random().toString(36).substring(2, 9);
+      const invoiceId = 'inv-' + crypto.randomUUID();
 
       // Save Invoice to DB
       await db.invoices.insert({
@@ -294,7 +257,7 @@ export const POS = () => {
 
       // Save Debt to DB if needed
       if (paymentType === 'debt') {
-        const debtId = 'debt-' + Math.random().toString(36).substring(2, 9);
+        const debtId = 'debt-' + crypto.randomUUID();
         await db.debts.insert({
           debt_id: debtId,
           client_supplier_name: clientName,
@@ -321,7 +284,7 @@ export const POS = () => {
       setCompletedCart([...cart]);
       loadPrintSettings();
 
-      setCart([]);
+      clearCart();
       setClientName('');
       setDiscountEnabled(false);
       setDiscountValue(0);
@@ -332,14 +295,16 @@ export const POS = () => {
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const query = searchTerm.toLowerCase();
-    return (
-      p.barcode?.toLowerCase().includes(query) ||
-      p.name_ar?.toLowerCase().includes(query) ||
-      p.name_en?.toLowerCase().includes(query)
-    );
-  });
+  const filteredProducts = useMemo(() => {
+    const query = debouncedSearchTerm.toLowerCase();
+    return products.filter(p => {
+      return (
+        p.barcode?.toLowerCase().includes(query) ||
+        p.name_ar?.toLowerCase().includes(query) ||
+        p.name_en?.toLowerCase().includes(query)
+      );
+    });
+  }, [products, debouncedSearchTerm]);
 
   const cartTotal = calculateCartTotal();
   const isAr = i18n.language === 'ar';

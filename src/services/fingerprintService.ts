@@ -63,22 +63,16 @@ export async function getHardwareFingerprint(): Promise<string> {
   // RAM size in GB (navigator.deviceMemory is standard in Chromium)
   const ramSize = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
   
-  // Screen details
-  const screenDetails = `${screen.width}x${screen.height}x${screen.colorDepth}`;
+  // Platform via userAgent (navigator.platform is deprecated)
+  const userAgent = navigator.userAgent || 'unknown';
   
-  // Platform & Languages
-  const platformInfo = navigator.platform || 'unknown';
-  const language = navigator.language || 'en';
-  
-  // Build raw fingerprint payload
+  // Build raw fingerprint payload (excluding volatile screenDetails and language to prevent false validation failures)
   const rawFingerprint = [
     canvasInfo,
     webGLInfo,
     cpuCores,
     ramSize,
-    screenDetails,
-    platformInfo,
-    language
+    userAgent
   ].join('##');
   
   return await sha256(rawFingerprint);

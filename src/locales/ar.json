@@ -217,6 +217,7 @@
   "discount_amount": "قيمة الخصم",
   "enable_discount": "تفعيل الخصم",
   "quantity_exceeds_stock": "الكمية تتجاوز المخزون المتاح",
+  "general": "عام",
   "error_occurred": "حدث خطأ غير متوقع",
   "reload_app": "إعادة تحميل التطبيق",
   "error_description": "يرجى إعادة تحميل التطبيق. إذا استمرت المشكلة، يرجى التواصل مع الدعم الفني."

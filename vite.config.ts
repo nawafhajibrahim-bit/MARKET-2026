@@ -11,13 +11,16 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true
+        enabled: false
       },
       manifest: {
         name: 'Smart Market MS',
         short_name: 'SmartMarket',
         description: 'Universal Offline-First POS & Inventory System',
         theme_color: '#ffffff',
+        background_color: '#ffffff',
+        start_url: '/',
+        display: 'standalone',
         icons: [
           {
             src: 'pwa-192x192.png',

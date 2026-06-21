@@ -8,18 +8,19 @@ export const productSchemaLiteral = {
     type: 'object',
     properties: {
         id: { type: 'string', maxLength: 100 },
-        barcode: { type: 'string' },
+        barcode: { type: 'string', maxLength: 100 },
         sku_serial: { type: 'string' },
         name_ar: { type: 'string' },
         name_en: { type: 'string' },
-        category: { type: 'string' },
+        category: { type: 'string', maxLength: 100 },
         cost_price: { type: 'number' },
         sale_price: { type: 'number' },
         stock_quantity: { type: 'number' },
         min_safety_stock: { type: 'number' },
         expiry_date: { type: 'string' },
     },
-    required: ['id', 'name_ar', 'cost_price', 'sale_price', 'stock_quantity'],
+    required: ['id', 'barcode', 'category', 'name_ar', 'cost_price', 'sale_price', 'stock_quantity'],
+    indexes: ['barcode', 'category'],
 } as const;
 export const schemaTypedProduct = toTypedRxJsonSchema(productSchemaLiteral);
 export type ProductDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedProduct>;
@@ -33,12 +34,13 @@ export const unitSchemaLiteral = {
     type: 'object',
     properties: {
         unit_id: { type: 'string', maxLength: 100 },
-        product_id: { type: 'string' },
+        product_id: { type: 'string', maxLength: 100 },
         unit_name: { type: 'string' },
         conversion_factor: { type: 'number' },
         price_per_unit: { type: 'number' },
     },
     required: ['unit_id', 'product_id', 'unit_name', 'conversion_factor', 'price_per_unit'],
+    indexes: ['product_id'],
 } as const;
 export const schemaTypedUnit = toTypedRxJsonSchema(unitSchemaLiteral);
 export type UnitDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedUnit>;
@@ -52,7 +54,7 @@ export const invoiceSchemaLiteral = {
     type: 'object',
     properties: {
         invoice_id: { type: 'string', maxLength: 100 },
-        timestamp: { type: 'string' },
+        timestamp: { type: 'string', maxLength: 100 },
         items: {
             type: 'array',
             items: {
@@ -73,6 +75,7 @@ export const invoiceSchemaLiteral = {
         discount_amount: { type: 'number' },
     },
     required: ['invoice_id', 'timestamp', 'total_amount', 'currency', 'payment_type'],
+    indexes: ['timestamp'],
 } as const;
 export const schemaTypedInvoice = toTypedRxJsonSchema(invoiceSchemaLiteral);
 export type InvoiceDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedInvoice>;
@@ -92,9 +95,10 @@ export const debtSchemaLiteral = {
         amount: { type: 'number' },
         paid_amount: { type: 'number' },
         due_date: { type: 'string' },
-        status: { type: 'string' }, // 'Pending' or 'Paid'
+        status: { type: 'string', maxLength: 50 }, // 'Pending' or 'Paid'
     },
     required: ['debt_id', 'client_supplier_name', 'type', 'amount', 'status'],
+    indexes: ['status'],
 } as const;
 export const schemaTypedDebt = toTypedRxJsonSchema(debtSchemaLiteral);
 export type DebtDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedDebt>;

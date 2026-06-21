@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { POS } from './pages/POS';
@@ -26,15 +26,16 @@ function App() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route path="admin" element={<Admin />} />
-          </Route>
-          
-          <Route path="/" element={<LicenseInterceptor><Layout /></LicenseInterceptor>}>
-            <Route index element={<Dashboard />} />
-            <Route path="pos" element={<POS />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="debts" element={<Debts />} />
-            <Route path="sales-history" element={<SalesHistory />} />
+            
+            <Route element={<LicenseInterceptor><Outlet /></LicenseInterceptor>}>
+              <Route index element={<Dashboard />} />
+              <Route path="pos" element={<POS />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="debts" element={<Debts />} />
+              <Route path="sales-history" element={<SalesHistory />} />
+            </Route>
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

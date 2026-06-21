@@ -8,30 +8,18 @@ import { formatCurrency } from '../utils/currency';
 
 const AIEngine = React.lazy(() => import('../modules/ai/AIEngine'));
 
-interface DashboardStats {
-  todayRevenue: number;
-  monthRevenue: number;
-  totalProfit: number;
-  pendingDebts: number;
-  lowStockCount: number;
-  totalProducts: number;
-  monthlyChart: { name: string; revenue: number; profit: number }[];
-  topProducts: { name: string; count: number }[];
-}
-
 export const Dashboard = () => {
   const { t, i18n } = useTranslation();
   const db = useDb();
   const [aiEnabled, setAiEnabled] = useState(false);
-  const [stats, setStats] = useState<DashboardStats>({
-    todayRevenue: 0,
-    monthRevenue: 0,
-    totalProfit: 0,
-    pendingDebts: 0,
-    lowStockCount: 0,
-    totalProducts: 0,
-    monthlyChart: [],
-    topProducts: [],
+  const [data, setData] = useState<{
+    invoices: InvoiceDocType[];
+    debts: DebtDocType[];
+    products: ProductDocType[];
+  }>({
+    invoices: [],
+    debts: [],
+    products: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -53,97 +41,11 @@ export const Dashboard = () => {
           db.products.find().exec(),
         ]);
 
-        const invoices: InvoiceDocType[] = invoiceDocs.map(d => d.toJSON());
-        const debts: DebtDocType[] = debtDocs.map(d => d.toJSON());
-        const products: ProductDocType[] = productDocs.map(d => d.toJSON());
-
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        // Today revenue
-        const todayRevenue = invoices
-          .filter(inv => new Date(inv.timestamp) >= todayStart)
-          .reduce((sum, inv) => sum + inv.total_amount, 0);
-
-        // Month revenue
-        const monthRevenue = invoices
-          .filter(inv => new Date(inv.timestamp) >= monthStart)
-          .reduce((sum, inv) => sum + inv.total_amount, 0);
-
-        // Total profit (all time)
-        const totalProfit = invoices.reduce((sum, inv) => sum + (inv.actual_profit || 0), 0);
-
-        // Pending debts
-        const pendingDebts = debts
-          .filter(d => d.status === 'Pending' && d.type === 'Customer Debt')
-          .reduce((sum, d) => sum + d.amount, 0);
-
-        // Low stock
-        const lowStockCount = products.filter(p => p.stock_quantity <= (p.min_safety_stock ?? 0)).length;
-
-        // Build last 6 months chart data
-        const monthlyMap: Record<string, { revenue: number; profit: number }> = {};
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const key = `${d.getFullYear()}-${d.getMonth()}`;
-          monthlyMap[key] = { revenue: 0, profit: 0 };
-        }
-
-        invoices.forEach(inv => {
-          const d = new Date(inv.timestamp);
-          const key = `${d.getFullYear()}-${d.getMonth()}`;
-          if (monthlyMap[key] !== undefined) {
-            monthlyMap[key].revenue += inv.total_amount;
-            monthlyMap[key].profit += inv.actual_profit || 0;
-          }
-        });
-
-        const monthNames = [
-          t('jan'), t('feb'), t('mar'), t('apr'), t('may'), t('jun'),
-          t('jul'), t('aug'), t('sep'), t('oct'), t('nov'), t('dec'),
-        ];
-
-        const monthlyChart = Object.entries(monthlyMap).map(([key, val]) => {
-          const [, month] = key.split('-').map(Number);
-          return {
-            name: monthNames[month],
-            revenue: parseFloat(val.revenue.toFixed(2)),
-            profit: parseFloat(val.profit.toFixed(2)),
-          };
-        });
-
-        // Top selling products from invoice items
-        const productSaleCount: Record<string, number> = {};
-        invoices.forEach(inv => {
-          (inv.items || []).forEach((item) => {
-            if (item.product_id && item.quantity !== undefined) {
-              productSaleCount[item.product_id] = (productSaleCount[item.product_id] || 0) + item.quantity;
-            }
-          });
-        });
-
-        const topProducts = Object.entries(productSaleCount)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([id, count]) => {
-            const prod = products.find(p => p.id === id);
-            const name = prod
-              ? (i18n.language === 'ar' ? prod.name_ar : (prod.name_en || prod.name_ar))
-              : id;
-            return { name, count };
-          });
-
         if (isMounted) {
-          setStats({
-            todayRevenue,
-            monthRevenue,
-            totalProfit,
-            pendingDebts,
-            lowStockCount,
-            totalProducts: products.length,
-            monthlyChart,
-            topProducts,
+          setData({
+            invoices: invoiceDocs.map(d => d.toJSON()),
+            debts: debtDocs.map(d => d.toJSON()),
+            products: productDocs.map(d => d.toJSON()),
           });
           setLoading(false);
         }
@@ -166,7 +68,98 @@ export const Dashboard = () => {
       debtsSub.unsubscribe();
       productsSub.unsubscribe();
     };
-  }, [db, t, i18n.language]);
+  }, [db]);
+
+  const stats = React.useMemo(() => {
+    const { invoices, debts, products } = data;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Today revenue
+    const todayRevenue = invoices
+      .filter(inv => new Date(inv.timestamp) >= todayStart)
+      .reduce((sum, inv) => sum + inv.total_amount, 0);
+
+    // Month revenue
+    const monthRevenue = invoices
+      .filter(inv => new Date(inv.timestamp) >= monthStart)
+      .reduce((sum, inv) => sum + inv.total_amount, 0);
+
+    // Total profit (all time)
+    const totalProfit = invoices.reduce((sum, inv) => sum + (inv.actual_profit || 0), 0);
+
+    // Pending debts
+    const pendingDebts = debts
+      .filter(d => d.status === 'Pending' && d.type === 'Customer Debt')
+      .reduce((sum, d) => sum + d.amount, 0);
+
+    // Low stock
+    const lowStockCount = products.filter(p => p.stock_quantity <= (p.min_safety_stock ?? 0)).length;
+
+    // Build last 6 months chart data
+    const monthlyMap: Record<string, { revenue: number; profit: number }> = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthlyMap[key] = { revenue: 0, profit: 0 };
+    }
+
+    invoices.forEach(inv => {
+      const d = new Date(inv.timestamp);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (monthlyMap[key] !== undefined) {
+        monthlyMap[key].revenue += inv.total_amount;
+        monthlyMap[key].profit += inv.actual_profit || 0;
+      }
+    });
+
+    const monthNames = [
+      t('jan'), t('feb'), t('mar'), t('apr'), t('may'), t('jun'),
+      t('jul'), t('aug'), t('sep'), t('oct'), t('nov'), t('dec'),
+    ];
+
+    const monthlyChart = Object.entries(monthlyMap).map(([key, val]) => {
+      const [, month] = key.split('-').map(Number);
+      return {
+        name: monthNames[month],
+        revenue: parseFloat(val.revenue.toFixed(2)),
+        profit: parseFloat(val.profit.toFixed(2)),
+      };
+    });
+
+    // Top selling products from invoice items
+    const productSaleCount: Record<string, number> = {};
+    invoices.forEach(inv => {
+      (inv.items || []).forEach((item) => {
+        if (item.product_id && item.quantity !== undefined) {
+          productSaleCount[item.product_id] = (productSaleCount[item.product_id] || 0) + item.quantity;
+        }
+      });
+    });
+
+    const topProducts = Object.entries(productSaleCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([id, count]) => {
+        const prod = products.find(p => p.id === id);
+        const name = prod
+          ? (i18n.language === 'ar' ? prod.name_ar : (prod.name_en || prod.name_ar))
+          : id;
+        return { name, count };
+      });
+
+    return {
+      todayRevenue,
+      monthRevenue,
+      totalProfit,
+      pendingDebts,
+      lowStockCount,
+      totalProducts: products.length,
+      monthlyChart,
+      topProducts,
+    };
+  }, [data, t, i18n.language]);
 
   const fmt = (n: number) => formatCurrency(n);
 

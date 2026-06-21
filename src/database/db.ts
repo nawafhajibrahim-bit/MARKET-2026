@@ -24,7 +24,7 @@ addRxPlugin(RxDBUpdatePlugin);
 addRxPlugin(RxDBJsonDumpPlugin);
 
 export const initDB = async () => {
-    const dbName = 'smartmarketdb_v3';
+    const dbName = 'smartmarketdb_v4';
     const storage = wrappedValidateAjvStorage({
         storage: getRxStorageDexie()
     });

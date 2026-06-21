@@ -28,9 +28,28 @@ export const Debts = () => {
   const [paymentInstallment, setPaymentInstallment] = useState<number>(0);
   const [paymentSaving, setPaymentSaving] = useState(false);
 
+  // Notification Toast State
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+
+  const triggerNotification = (msg: string, type: 'success' | 'error' = 'success') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(null), 3000);
+  };
+
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recordPaymentId || paymentInstallment <= 0) return;
+    if (!recordPaymentId) return;
+    
+    if (Number(paymentInstallment) <= 0) {
+      triggerNotification(
+        isRtl ? 'مبلغ الدفعة يجب أن يكون أكبر من صفر!' : 'Payment amount must be greater than zero.',
+        'error'
+      );
+      return;
+    }
+
     setPaymentSaving(true);
     try {
       const doc = await db.debts.findOne(recordPaymentId).exec();
@@ -45,9 +64,18 @@ export const Debts = () => {
         });
         setRecordPaymentId(null);
         setPaymentInstallment(0);
+
+        triggerNotification(
+          isRtl ? 'تم تسجيل الدفعة بنجاح!' : 'Payment recorded successfully!',
+          'success'
+        );
       }
     } catch (err) {
       console.error('Failed to record payment installment:', err);
+      triggerNotification(
+        isRtl ? 'فشل تسجيل الدفعة!' : 'Failed to record payment!',
+        'error'
+      );
     } finally {
       setPaymentSaving(false);
     }
@@ -84,9 +112,17 @@ export const Debts = () => {
           status: 'Paid',
           paid_amount: doc.toJSON().amount
         });
+        triggerNotification(
+          isRtl ? 'تم تحصيل الدين بنجاح!' : 'Debt marked as paid successfully!',
+          'success'
+        );
       }
     } catch (err) {
       console.error('Failed to update debt:', err);
+      triggerNotification(
+        isRtl ? 'فشل تحصيل الدين!' : 'Failed to mark debt as paid!',
+        'error'
+      );
     } finally {
       setConfirmPayId(null);
     }
@@ -94,10 +130,26 @@ export const Debts = () => {
 
   const handleAddDebt = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || newAmount <= 0) return;
+    
+    if (!newName.trim()) {
+      triggerNotification(
+        isRtl ? 'اسم المدين / الدائن مطلوب!' : 'Name is required.',
+        'error'
+      );
+      return;
+    }
+
+    if (Number(newAmount) <= 0) {
+      triggerNotification(
+        isRtl ? 'قيمة الدين يجب أن تكون أكبر من صفر!' : 'Amount must be greater than zero.',
+        'error'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
-      const debtId = 'debt-' + Math.random().toString(36).substring(2, 9);
+      const debtId = 'debt-' + crypto.randomUUID();
       await db.debts.insert({
         debt_id: debtId,
         client_supplier_name: newName,
@@ -113,8 +165,17 @@ export const Debts = () => {
       setNewAmount(0);
       setNewDueDate('');
       setShowAddModal(false);
+      
+      triggerNotification(
+        isRtl ? 'تم تسجيل الدين بنجاح!' : 'Debt added successfully!',
+        'success'
+      );
     } catch (err) {
       console.error('Failed to add debt:', err);
+      triggerNotification(
+        isRtl ? 'فشل إضافة الدين!' : 'Failed to add debt!',
+        'error'
+      );
     } finally {
       setSaving(false);
     }
@@ -492,6 +553,15 @@ export const Debts = () => {
           </div>
         );
       })()}
+      {/* Toast Notification */}
+      {message && (
+        <div className={`fixed bottom-4 left-4 right-4 md:left-auto md:w-96 text-white p-4 rounded-xl shadow-lg z-[300] flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300 ${
+          messageType === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`}>
+          <span>{messageType === 'success' ? '✅' : '⚠️'}</span>
+          <span>{message}</span>
+        </div>
+      )}
     </div>
   );
 };
