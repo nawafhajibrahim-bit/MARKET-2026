@@ -1,13 +1,15 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: #aa3bff;
-  --color-bg-light: #ffffff;
-  --color-text-light: #08060d;
-  --color-bg-dark: #16171d;
-  --color-text-dark: #f3f4f6;
-  --color-bg-eye: #f4f1e1;
-  --color-text-eye: #3b352b;
+  --color-bg-light: #f8fafc; /* Soft slate-50 instead of pure harsh white */
+  --color-text-light: #0f172a; /* Slate-900 for modern feel */
+  --color-bg-dark: #090a0f; /* Deep obsidian black */
+  --color-text-dark: #f1f5f9; /* Slate-100 */
+  --color-bg-eye: #fcf8ee; /* Warm, comfortable sepia background */
+  --color-text-eye: #443c30; /* Soft dark brown */
 }
 
 @layer base {
@@ -21,6 +23,41 @@
     --text: var(--color-text-dark);
   }
 
+  /* Global dark-mode safety net overrides for high contrast and comfortable readability */
+  .dark .text-gray-700 {
+    color: #cbd5e1 !important; /* Slate-300 */
+  }
+  .dark .text-gray-600 {
+    color: #94a3b8 !important; /* Slate-400 */
+  }
+  .dark .text-gray-500 {
+    color: #94a3b8 !important; /* Slate-400 */
+  }
+  .dark .text-gray-400 {
+    color: #cbd5e1 !important; /* Slate-300 */
+  }
+  .dark .text-gray-300 {
+    color: #f1f5f9 !important; /* Slate-100 */
+  }
+
+  .dark .bg-gray-50 {
+    background-color: #0f1015 !important;
+  }
+  .dark .bg-gray-100 {
+    background-color: #171821 !important;
+  }
+  .dark .bg-gray-200 {
+    background-color: #20222f !important;
+  }
+  .dark .bg-gray-300 {
+    background-color: #2b2d3d !important;
+  }
+
+  .dark .border-gray-200,
+  .dark .border-gray-300 {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
   .eye-comfort {
     --bg: var(--color-bg-eye);
     --text: var(--color-text-eye);
@@ -29,9 +66,58 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    transition: background-color 0.2s, color 0.2s;
+    transition: background-color 0.3s, color 0.3s;
     margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Global improvements for Eye Comfort Theme cards */
+  .eye-comfort .bg-white,
+  .eye-comfort [class*="bg-white"] {
+    background-color: #fbf5e6 !important; /* Soft warm card background */
+  }
+
+  .eye-comfort .text-gray-700 {
+    color: #5c4e3b !important;
+  }
+  .eye-comfort .text-gray-600 {
+    color: #6e5e4b !important;
+  }
+  .eye-comfort .text-gray-500 {
+    color: #7d6e5a !important;
+  }
+  .eye-comfort .text-gray-400 {
+    color: #8c7d69 !important;
+  }
+  .eye-comfort .border-black\/10,
+  .eye-comfort .border-black\/5,
+  .eye-comfort .border-gray-200 {
+    border-color: rgba(74, 62, 44, 0.15) !important;
+  }
+  
+  /* Make sure inputs and selectors in eye-comfort mode are readable and match the theme */
+  .eye-comfort input, 
+  .eye-comfort select, 
+  .eye-comfort textarea {
+    background-color: rgba(74, 62, 44, 0.05) !important;
+    color: #443c30 !important;
+    border-color: rgba(74, 62, 44, 0.2) !important;
+  }
+
+  /* Navbar styling custom fixes for dropdowns and options */
+  select option {
+    background-color: var(--bg) !important;
+    color: var(--text) !important;
+  }
+
+  .dark select option {
+    background-color: #161720 !important;
+    color: #f1f5f9 !important;
+  }
+
+  .eye-comfort select option {
+    background-color: #fbf5e6 !important;
+    color: #443c30 !important;
   }
 }
 
@@ -58,4 +144,3 @@
     padding: 0;
   }
 }
-
