@@ -35,6 +35,8 @@ export const SalesHistory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // Detail modal
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDoc | null>(null);
@@ -103,6 +105,16 @@ export const SalesHistory = () => {
     }
     return true;
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateFrom, dateTo]);
+
+  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage) || 1;
+  const paginatedInvoices = filteredInvoices.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const formatDate = (isoStr: string) => {
     return new Date(isoStr).toLocaleString(isAr ? 'ar-IQ' : 'en-US', {
@@ -370,7 +382,7 @@ export const SalesHistory = () => {
                 </td>
               </tr>
             ) : (
-              filteredInvoices.map((inv) => {
+              paginatedInvoices.map((inv) => {
                 const isReturn = inv.total_amount < 0;
                 return (
                   <tr
@@ -434,6 +446,32 @@ export const SalesHistory = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 p-4 bg-white dark:bg-[#1f2028] rounded-xl shadow-sm border border-black/5 dark:border-white/5 select-none">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-semibold hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {i18n.language === 'ar' ? 'السابق' : 'Previous'}
+          </button>
+          <span className="text-sm font-medium text-gray-500">
+            {i18n.language === 'ar' 
+              ? `الصفحة ${currentPage} من ${totalPages}` 
+              : `Page ${currentPage} of ${totalPages}`
+            }
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-semibold hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {i18n.language === 'ar' ? 'التالي' : 'Next'}
+          </button>
+        </div>
+      )}
 
       {/* Invoice Detail Modal */}
       {selectedInvoice && (

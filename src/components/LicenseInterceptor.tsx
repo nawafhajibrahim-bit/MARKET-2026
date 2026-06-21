@@ -6,7 +6,7 @@ import { getHardwareFingerprint } from '../services/fingerprintService';
 import { encryptData, decryptData } from '../services/cryptoService';
 
 const DEMO_LICENSE_KEY = 'TEST-LICENSE';
-const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
+const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false';
 
 export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const db = useDb();

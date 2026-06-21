@@ -32,6 +32,8 @@ export const Inventory = () => {
   const [salePrice, setSalePrice] = useState(0);
   const [stockQuantity, setStockQuantity] = useState(0);
   const [minSafetyStock, setMinSafetyStock] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // Multi-unit configuration state
   const [additionalUnits, setAdditionalUnits] = useState<AdditionalUnit[]>([]);
@@ -339,6 +341,16 @@ export const Inventory = () => {
     );
   });
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const exportProductsToCSV = () => {
     const headers = [
       t('barcode'),
@@ -432,7 +444,7 @@ export const Inventory = () => {
                 </td>
               </tr>
             ) : (
-              filteredProducts.map((p) => {
+              paginatedProducts.map((p) => {
                 const isAr = i18n.language === 'ar';
                 const displayName = isAr ? p.name_ar : p.name_en;
                 const associatedUnits = unitsMap[p.id] || [];
@@ -497,6 +509,32 @@ export const Inventory = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 p-4 bg-white dark:bg-[#1f2028] rounded-xl shadow-sm border border-black/5 dark:border-white/5 select-none">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-semibold hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {i18n.language === 'ar' ? 'السابق' : 'Previous'}
+          </button>
+          <span className="text-sm font-medium text-gray-500">
+            {i18n.language === 'ar' 
+              ? `الصفحة ${currentPage} من ${totalPages}` 
+              : `Page ${currentPage} of ${totalPages}`
+            }
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-semibold hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {i18n.language === 'ar' ? 'التالي' : 'Next'}
+          </button>
+        </div>
+      )}
 
       {/* Add Product Modal */}
       {showModal && (

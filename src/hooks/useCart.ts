@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 
 export interface CartItem {
@@ -12,7 +12,18 @@ export function useCart(
   triggerNotification: (text: string, type: 'success' | 'error') => void,
   t: (key: string) => string
 ) {
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('pos_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pos_cart', JSON.stringify(cart));
+  }, [cart]);
 
   const getProductQtyInCart = (productId: string, excludeIndex?: number) => {
     return cart.reduce((sum, item, idx) => {

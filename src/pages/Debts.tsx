@@ -27,6 +27,8 @@ export const Debts = () => {
   const [recordPaymentId, setRecordPaymentId] = useState<string | null>(null);
   const [paymentInstallment, setPaymentInstallment] = useState<number>(0);
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // Notification Toast State
   const [message, setMessage] = useState<string | null>(null);
@@ -91,6 +93,16 @@ export const Debts = () => {
   const isRtl = i18n.language === 'ar';
 
   const filteredDebts = debts.filter(d => filter === 'all' || d.status === filter);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
+  const totalPages = Math.ceil(filteredDebts.length / itemsPerPage) || 1;
+  const paginatedDebts = filteredDebts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const totalPending = debts
     .filter(d => d.status === 'Pending' && d.type === 'Customer Debt')
@@ -284,7 +296,7 @@ export const Debts = () => {
                 </td>
               </tr>
             ) : (
-              filteredDebts.map((debt) => {
+              paginatedDebts.map((debt) => {
                 const overdue = debt.status === 'Pending' && isOverdue(debt.due_date);
                 return (
                   <tr key={debt.debt_id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
@@ -372,6 +384,32 @@ export const Debts = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center mt-4 p-4 bg-white dark:bg-[#1f2028] rounded-xl shadow-sm border border-black/5 dark:border-white/5 select-none">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="px-4 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-semibold hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {i18n.language === 'ar' ? 'السابق' : 'Previous'}
+          </button>
+          <span className="text-sm font-medium text-gray-500">
+            {i18n.language === 'ar' 
+              ? `الصفحة ${currentPage} من ${totalPages}` 
+              : `Page ${currentPage} of ${totalPages}`
+            }
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="px-4 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-semibold hover:bg-black/10 dark:hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            {i18n.language === 'ar' ? 'التالي' : 'Next'}
+          </button>
+        </div>
+      )}
 
       {/* Confirm Pay Modal */}
       {confirmPayId && (
