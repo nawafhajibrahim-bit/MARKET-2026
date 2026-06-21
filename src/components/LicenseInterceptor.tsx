@@ -271,6 +271,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     placeholder={t('license_placeholder')} 
                     className="w-full px-4 py-3 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none mb-2 font-mono text-center dir-ltr"
                  />
+                 <p className="text-xs opacity-60 mb-2">{t('test_bypass_desc')}</p>
                  {errorMsg && <p className="text-red-500 text-sm mb-4">{errorMsg}</p>}
                  
                  <button 

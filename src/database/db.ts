@@ -23,77 +23,92 @@ addRxPlugin(RxDBQueryBuilderPlugin);
 addRxPlugin(RxDBUpdatePlugin);
 addRxPlugin(RxDBJsonDumpPlugin);
 
-export const initDB = async () => {
-    const dbName = 'smartmarketdb_v4';
-    const storage = wrappedValidateAjvStorage({
-        storage: getRxStorageDexie()
+import type { RxDatabase } from 'rxdb';
+
+let dbPromise: Promise<RxDatabase> | null = null;
+
+export const initDB = async (): Promise<RxDatabase> => {
+    if (dbPromise) {
+        return dbPromise;
+    }
+
+    dbPromise = (async () => {
+        const dbName = 'smartmarketdb_v4';
+        const storage = wrappedValidateAjvStorage({
+            storage: getRxStorageDexie()
+        });
+
+        try {
+            // Create the database
+            const db = await createRxDatabase({
+                name: dbName,
+                storage,
+                ignoreDuplicate: import.meta.env.DEV // Allowed in dev-mode for React Strict Mode, disabled in production
+            });
+
+            // Add collections
+            await db.addCollections({
+                products: {
+                    schema: productSchema
+                },
+                units: {
+                    schema: unitSchema
+                },
+                invoices: {
+                    schema: invoiceSchema
+                },
+                debts: {
+                    schema: debtSchema
+                },
+                system_config: {
+                    schema: systemConfigSchema
+                }
+            });
+
+            await seedDemoData(db);
+            return db;
+        } catch (err) {
+            console.warn('Database initialization failed (likely schema mismatch). Recreating database...', err);
+            try {
+                await removeRxDatabase(dbName, storage);
+            } catch (removeErr) {
+                console.error('Failed to remove database', removeErr);
+            }
+
+            // Retry creation from scratch
+            const db = await createRxDatabase({
+                name: dbName,
+                storage,
+                ignoreDuplicate: import.meta.env.DEV
+            });
+
+            await db.addCollections({
+                products: {
+                    schema: productSchema
+                },
+                units: {
+                    schema: unitSchema
+                },
+                invoices: {
+                    schema: invoiceSchema
+                },
+                debts: {
+                    schema: debtSchema
+                },
+                system_config: {
+                    schema: systemConfigSchema
+                }
+            });
+
+            await seedDemoData(db);
+            return db;
+        }
+    })().catch((err) => {
+        dbPromise = null; // Reset promise on total failure to allow subsequent retries
+        throw err;
     });
 
-    try {
-        // Create the database
-        const db = await createRxDatabase({
-            name: dbName,
-            storage,
-            ignoreDuplicate: import.meta.env.DEV // Allowed in dev-mode for React Strict Mode, disabled in production
-        });
-
-        // Add collections
-        await db.addCollections({
-            products: {
-                schema: productSchema
-            },
-            units: {
-                schema: unitSchema
-            },
-            invoices: {
-                schema: invoiceSchema
-            },
-            debts: {
-                schema: debtSchema
-            },
-            system_config: {
-                schema: systemConfigSchema
-            }
-        });
-
-        await seedDemoData(db);
-        return db;
-    } catch (err) {
-        console.warn('Database initialization failed (likely schema mismatch). Recreating database...', err);
-        try {
-            await removeRxDatabase(dbName, storage);
-        } catch (removeErr) {
-            console.error('Failed to remove database', removeErr);
-        }
-
-        // Retry creation from scratch
-        const db = await createRxDatabase({
-            name: dbName,
-            storage,
-            ignoreDuplicate: import.meta.env.DEV
-        });
-
-        await db.addCollections({
-            products: {
-                schema: productSchema
-            },
-            units: {
-                schema: unitSchema
-            },
-            invoices: {
-                schema: invoiceSchema
-            },
-            debts: {
-                schema: debtSchema
-            },
-            system_config: {
-                schema: systemConfigSchema
-            }
-        });
-
-        await seedDemoData(db);
-        return db;
-    }
+    return dbPromise;
 };
 
 const seedDemoData = async (db: any) => {
