@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CloudUpload, RefreshCcw, CheckCircle, AlertCircle, Coins, Printer } from 'lucide-react';
+import { CloudUpload, RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload } from 'lucide-react';
+import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useGoogleLogin } from '@react-oauth/google';
 import { GoogleDriveService } from '../services/GoogleDriveService';
 import { useDb } from '../database/Provider';
@@ -17,6 +18,8 @@ export const Settings = () => {
   const [isAutoBackup, setIsAutoBackup] = useState(() => localStorage.getItem('auto_backup_enabled') === 'true');
   const [backupStatus, setBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [customClientId, setCustomClientId] = useState(() => localStorage.getItem('custom_google_client_id') || '');
+  const [localBackupStatus, setLocalBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [customGroqKey, setCustomGroqKey] = useState(() => localStorage.getItem('custom_groq_key') || '');
   const [aiModel, setAiModel] = useState(() => {
     let saved = localStorage.getItem('ai_model') || 'llama-3.1-8b-instant';
@@ -93,6 +96,88 @@ export const Settings = () => {
     localStorage.setItem('auto_backup_enabled', newVal.toString());
   };
 
+  const handleCustomClientIdChange = (val: string) => {
+    setCustomClientId(val);
+    if (val.trim()) {
+      localStorage.setItem('custom_google_client_id', val.trim());
+    } else {
+      localStorage.removeItem('custom_google_client_id');
+    }
+    window.dispatchEvent(new Event('google_client_id_changed'));
+  };
+
+  const handleLocalExport = async () => {
+    setLocalBackupStatus('loading');
+    try {
+      const dump = await db.exportJSON();
+      const uint8 = strToU8(JSON.stringify(dump));
+      const zipped = zipSync({
+        'smartmarket_backup.json': uint8
+      });
+      const blob = new Blob([zipped], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `smartmarket_backup_${new Date().toISOString().split('T')[0]}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setLocalBackupStatus('success');
+      setTimeout(() => setLocalBackupStatus('idle'), 3000);
+    } catch (err) {
+      console.error(err);
+      setLocalBackupStatus('error');
+      setTimeout(() => setLocalBackupStatus('idle'), 3000);
+    }
+  };
+
+  const handleLocalRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const buffer = event.target?.result as ArrayBuffer;
+        const unzipped = unzipSync(new Uint8Array(buffer));
+        const jsonUint8 = unzipped['smartmarket_backup.json'];
+        if (!jsonUint8) {
+          alert(t('invalid_backup_file') || 'Invalid backup file: smartmarket_backup.json not found in ZIP');
+          return;
+        }
+        const jsonString = new TextDecoder().decode(jsonUint8);
+        const dump = JSON.parse(jsonString);
+
+        if (!window.confirm(t('confirm_restore_warn') || 'WARNING: This will overwrite all current local data with the backup file. Are you sure?')) {
+          e.target.value = '';
+          return;
+        }
+
+        setLocalBackupStatus('loading');
+
+        const collections = ['products', 'units', 'invoices', 'debts', 'system_config'];
+        for (const colName of collections) {
+          const docs = await db[colName].find().exec();
+          for (const doc of docs) {
+            await doc.remove();
+          }
+        }
+
+        await db.importJSON(dump);
+
+        setLocalBackupStatus('success');
+        alert(t('restore_success') || 'Database restored successfully! The page will now reload.');
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        alert(t('restore_error') || 'Failed to restore database. Make sure the file is a valid SmartMarket backup ZIP.');
+        setLocalBackupStatus('error');
+        setTimeout(() => setLocalBackupStatus('idle'), 3000);
+        e.target.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   const executeBackup = async (tokenResponse: GoogleTokenResponse) => {
     setBackupStatus('loading');
     try {
@@ -167,7 +252,76 @@ export const Settings = () => {
                     <CheckCircle size={18} /> {t('backup_success')}
                 </div>
             )}
+
             {backupStatus === 'error' && (
+                <div className="flex items-center gap-2 text-red-600 bg-red-500/10 p-3 rounded-lg font-medium">
+                    <AlertCircle size={18} /> {t('backup_error')}
+                </div>
+            )}
+
+            <div className="pt-6 border-t border-black/5 dark:border-white/5 space-y-2">
+                <label className="block text-sm font-medium">{t('google_client_id_label')}</label>
+                <p className="text-xs text-gray-500 mb-1">{t('google_client_id_desc')}</p>
+                <input 
+                    type="text"
+                    value={customClientId}
+                    onChange={(e) => handleCustomClientIdChange(e.target.value)}
+                    placeholder={t('google_client_id_placeholder') || 'Enter Google Client ID...'}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono text-xs"
+                />
+            </div>
+        </div>
+      </div>
+
+      {/* Local Offline Backup Card */}
+      <div className="bg-white dark:bg-[#1f2028] p-6 rounded-xl shadow-sm border border-black/10 dark:border-white/10 mt-8">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-black/5 dark:border-white/5">
+            <Download className="text-[var(--color-primary)]" size={28} />
+            <h3 className="text-xl font-semibold">{t('local_backup_title')}</h3>
+        </div>
+
+        <div className="space-y-6">
+            <div>
+                <p className="text-sm text-gray-500 mb-4">{t('local_backup_desc')}</p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-black/5 dark:border-white/5">
+                <button 
+                    onClick={handleLocalExport}
+                    disabled={localBackupStatus === 'loading'}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-[var(--color-primary)]/10 hover:bg-[var(--color-primary)]/20 text-[var(--color-primary)] font-semibold rounded-xl active:scale-95 disabled:opacity-50 transition-all cursor-pointer text-center"
+                >
+                    <Download size={18} /> {t('export_backup_btn')}
+                </button>
+
+                <div className="flex-1 relative">
+                    <input 
+                        type="file" 
+                        accept=".zip" 
+                        id="local-restore-file"
+                        onChange={handleLocalRestore}
+                        className="hidden" 
+                    />
+                    <label 
+                        htmlFor="local-restore-file"
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 font-semibold rounded-xl active:scale-95 cursor-pointer text-center"
+                    >
+                        <Upload size={18} /> {t('import_backup_btn')}
+                    </label>
+                </div>
+            </div>
+
+            {localBackupStatus === 'loading' && (
+                <div className="flex items-center gap-2 text-[var(--color-primary)] bg-[var(--color-primary)]/10 p-3 rounded-lg font-medium">
+                    <RefreshCcw size={18} className="animate-spin" /> {t('processing') || 'Processing...'}
+                </div>
+            )}
+            {localBackupStatus === 'success' && (
+                <div className="flex items-center gap-2 text-green-600 bg-green-500/10 p-3 rounded-lg font-medium">
+                    <CheckCircle size={18} /> {t('backup_success')}
+                </div>
+            )}
+            {localBackupStatus === 'error' && (
                 <div className="flex items-center gap-2 text-red-600 bg-red-500/10 p-3 rounded-lg font-medium">
                     <AlertCircle size={18} /> {t('backup_error')}
                 </div>

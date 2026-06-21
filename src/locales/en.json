@@ -220,5 +220,16 @@
   "general": "General",
   "error_occurred": "An unexpected error occurred",
   "reload_app": "Reload Application",
-  "error_description": "Please reload the app. If the problem persists, contact support."
+  "error_description": "Please reload the app. If the problem persists, contact support.",
+  "local_backup_title": "Local Backup & Restore (Recommended Offline)",
+  "local_backup_desc": "Export or import a full backup of your database as a compressed ZIP file locally without an internet connection.",
+  "export_backup_btn": "Download Backup (ZIP)",
+  "import_backup_btn": "Restore Data from ZIP",
+  "google_client_id_label": "Custom Google Client ID",
+  "google_client_id_desc": "Enter your own Google Cloud Console Client ID to bypass the invalid_client error.",
+  "google_client_id_placeholder": "Enter Google Client ID...",
+  "confirm_restore_warn": "WARNING: This will overwrite all current local data with the backup file. Are you sure?",
+  "restore_success": "Database restored successfully! The page will now reload.",
+  "restore_error": "Failed to restore database. Make sure the file is a valid SmartMarket backup ZIP.",
+  "invalid_backup_file": "Invalid backup file: smartmarket_backup.json not found in ZIP."
 }
