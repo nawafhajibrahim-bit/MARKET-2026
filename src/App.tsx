@@ -12,6 +12,8 @@ import { SalesHistory } from './pages/SalesHistory';
 import { LicenseInterceptor } from './components/LicenseInterceptor';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+import { AutoBackupRunner } from './components/AutoBackupRunner';
+
 function App() {
   const { i18n } = useTranslation();
 
@@ -22,6 +24,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <AutoBackupRunner />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
