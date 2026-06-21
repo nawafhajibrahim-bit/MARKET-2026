@@ -42,6 +42,21 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           clock_tamper_detected 
         } = configDoc.toJSON();
 
+        // If it's a demo key and activated, authorize directly without showing the offline warning bar
+        const isDemoBypassKey = license_key === 'TEST-LICENSE' || 
+                                 license_key === 'TEST' || 
+                                 license_key === '1234' || 
+                                 license_key === '123456' || 
+                                 license_key === '123';
+
+        if (isDemoLoginEnabled && isDemoBypassKey && activation_status) {
+            if (isMounted) {
+                setWarningMessage(null);
+                setIsAuthorized(true);
+            }
+            return;
+        }
+
         // Check for clock manipulation
         const lastSync = last_sync_timestamp ? new Date(last_sync_timestamp) : null;
         const now = new Date();
