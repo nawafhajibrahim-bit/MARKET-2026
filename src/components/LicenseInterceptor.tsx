@@ -180,8 +180,13 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           const tokenPayload = JSON.stringify({ license_key: licenseKey, hw_fingerprint: hwFingerprint });
           const activationToken = await encryptData(tokenPayload, hwFingerprint);
 
-          // If offline or testing, allow 'TEST-LICENSE' bypass only if demo login is enabled
-          if (isDemoLoginEnabled && (licenseKey === DEMO_LICENSE_KEY || licenseKey === 'TEST')) {
+          // If offline or testing, allow demo bypass keys only if demo login is enabled
+          const isDemoBypassKey = licenseKey === DEMO_LICENSE_KEY || 
+                                   licenseKey === 'TEST' || 
+                                   licenseKey === '1234' || 
+                                   licenseKey === '123456' || 
+                                   licenseKey === '123';
+          if (isDemoLoginEnabled && isDemoBypassKey) {
               await db.system_config.insert({
                   id: 'config',
                   license_key: licenseKey,
@@ -259,39 +264,54 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
   if (isAuthorized === false) {
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg)] text-[var(--text)] p-4 text-center">
-              <div className="bg-white dark:bg-[#1f2028] p-8 rounded-2xl border border-red-500/30 max-w-md w-full shadow-lg">
-                 <h1 className="text-3xl font-bold text-red-500 mb-4">{t('license_required')}</h1>
-                 <p className="mb-6 opacity-80">
+              <div className="bg-white dark:bg-[#1f2028] p-8 rounded-2xl border border-red-500/30 max-w-md w-full shadow-lg space-y-4">
+                 <h1 className="text-3xl font-bold text-red-500">{t('license_required')}</h1>
+                 <p className="text-sm opacity-80">
                      {t('license_missing_desc')}
                  </p>
-                 <input 
-                    type="text" 
-                    value={inputKey}
-                    onChange={(e) => setInputKey(e.target.value)}
-                    placeholder={t('license_placeholder')} 
-                    className="w-full px-4 py-3 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none mb-2 font-mono text-center dir-ltr"
-                 />
-                 <p className="text-xs opacity-60 mb-2">{t('test_bypass_desc')}</p>
-                 {errorMsg && <p className="text-red-500 text-sm mb-4">{errorMsg}</p>}
-                 
-                 <button 
-                    onClick={() => handleActivate()}
-                    disabled={loading}
-                    className="w-full mt-4 py-3 bg-[var(--color-primary)] text-white font-bold rounded-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                 >
-                     {loading ? t('verifying') : t('activate_license')}
-                 </button>
 
                  {isDemoLoginEnabled && (
-                    <button
-                      type="button"
-                      onClick={() => handleActivate(DEMO_LICENSE_KEY)}
-                      disabled={loading}
-                      className="w-full mt-3 py-3 border border-[var(--color-primary)] text-[var(--color-primary)] font-bold rounded-lg hover:bg-[var(--color-primary)]/10 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                    >
-                      {t('demo_login')}
-                    </button>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleActivate(DEMO_LICENSE_KEY)}
+                        disabled={loading}
+                        className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 cursor-pointer shadow-lg text-lg flex items-center justify-center gap-2"
+                      >
+                        ⚡ {t('demo_login')}
+                      </button>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        {t('test_bypass_desc')}
+                      </p>
+                    </div>
                  )}
+
+                 {isDemoLoginEnabled && (
+                    <div className="relative flex py-2 items-center">
+                        <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+                        <span className="flex-shrink mx-4 text-gray-400 text-xs font-semibold uppercase">{t('or_enter_license')}</span>
+                        <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+                    </div>
+                 )}
+
+                 <div className="space-y-3">
+                   <input 
+                      type="text" 
+                      value={inputKey}
+                      onChange={(e) => setInputKey(e.target.value)}
+                      placeholder={t('license_placeholder')} 
+                      className="w-full px-4 py-3 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono text-center dir-ltr"
+                   />
+                   {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
+                   
+                   <button 
+                      onClick={() => handleActivate()}
+                      disabled={loading}
+                      className="w-full py-3 border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 font-bold rounded-lg active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                   >
+                       {loading ? t('verifying') : t('activate_license')}
+                   </button>
+                 </div>
               </div>
           </div>
       );
