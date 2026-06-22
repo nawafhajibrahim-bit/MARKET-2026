@@ -132,7 +132,7 @@ export const systemConfigSchema: RxJsonSchema<SystemConfigDocType> = systemConfi
 // ───────────────────────────────────────────────
 export const userSchemaLiteral = {
     title: 'user schema',
-    version: 0,
+    version: 1,
     primaryKey: 'user_id',
     type: 'object',
     properties: {

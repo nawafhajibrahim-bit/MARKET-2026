@@ -77,7 +77,9 @@ export const initDB = async (): Promise<RxDatabase> => {
             },
             users: {
                 schema: userSchema,
-                migrationStrategies: {}
+                migrationStrategies: {
+                    1: (oldDoc: any) => oldDoc
+                }
             },
             branches: {
                 schema: branchSchema,
