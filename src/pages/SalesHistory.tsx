@@ -70,12 +70,12 @@ export const SalesHistory = () => {
   useEffect(() => {
     const invoiceSub = db.invoices.find({
       sort: [{ timestamp: 'desc' }]
-    }).$.subscribe((docs: any[]) => {
-      setInvoices(docs.map((d: any) => d.toJSON()));
+    }).$.subscribe((docs: import('rxdb').RxDocument<import('../database/schema').InvoiceDocType>[]) => {
+      setInvoices(docs.map((d) => d.toJSON() as unknown as InvoiceDoc));
     });
 
-    const productsSub = db.products.find().$.subscribe((docs: any[]) => {
-      setProducts(docs.map((d: any) => d.toJSON()));
+    const productsSub = db.products.find().$.subscribe((docs: import('rxdb').RxDocument<ProductDocType>[]) => {
+      setProducts(docs.map((d) => d.toJSON()));
     });
 
     return () => {
@@ -158,7 +158,7 @@ export const SalesHistory = () => {
             const unitDocs = await db.units.find({
               selector: { product_id: item.product_id }
             }).exec();
-            const matchingUnit = unitDocs.find((u: any) => u.toJSON().unit_name === item.unit_used);
+            const matchingUnit = unitDocs.find((u: import('rxdb').RxDocument<import('../database/schema').UnitDocType>) => u.toJSON().unit_name === item.unit_used);
             if (matchingUnit) {
               factor = matchingUnit.toJSON().conversion_factor;
             }

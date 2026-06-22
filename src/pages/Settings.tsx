@@ -1,21 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
+import { useAuth } from '../contexts/AuthContext';
 import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency } from '../utils/currency';
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
 import { runAutoBackup } from '../components/AutoBackupRunner';
+import {
+  isFolderBackupSupported,
+  isFolderBackupEnabled,
+  setFolderBackupEnabled,
+  getSelectedFolderName,
+  getMaxBackupsToKeep,
+  setMaxBackupsToKeep,
+  pickBackupFolder,
+  clearFolderSelection,
+} from '../services/folderBackupService';
 
 export const Settings = () => {
   const { t } = useTranslation();
   const db = useDb();
+  
+  const { currentUser, isAdmin } = useAuth();
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [newUsername, setNewUsername] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newRole, setNewRole] = useState<'cashier' | 'manager'>('cashier');
+  const [newPassword, setNewPassword] = useState('');
+  const [empError, setEmpError] = useState('');
+  const [empSuccess, setEmpSuccess] = useState('');
+  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null);
+  const [changePasswordVal, setChangePasswordVal] = useState('');
   
   const [isAutoBackup, setIsAutoBackup] = useState(() => localStorage.getItem('auto_backup_enabled') === 'true');
   const [autoBackupLocal, setAutoBackupLocal] = useState(() => localStorage.getItem('auto_backup_local') !== 'false');
   const [autoBackupDownloadFile, setAutoBackupDownloadFile] = useState(() => localStorage.getItem('auto_backup_download_file') === 'true');
   const [autoBackupInterval, setAutoBackupInterval] = useState(() => localStorage.getItem('auto_backup_interval') || '60');
   const [autoBackupOnExit, setAutoBackupOnExit] = useState(() => localStorage.getItem('auto_backup_on_exit') !== 'false');
+  // Folder backup state
+  const [folderBackupEnabled, setFolderBackupEnabledState] = useState(() => isFolderBackupEnabled());
+  const [selectedFolderName, setSelectedFolderName] = useState(() => getSelectedFolderName());
+  const [maxBackupsKeep, setMaxBackupsKeepState] = useState(() => getMaxBackupsToKeep());
+  const folderSupported = isFolderBackupSupported();
   const [localBackups, setLocalBackups] = useState<LocalBackup[]>([]);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [localBackupStatus, setLocalBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -113,6 +140,36 @@ export const Settings = () => {
   const handleToggleAutoBackupOnExit = (val: boolean) => {
     setAutoBackupOnExit(val);
     localStorage.setItem('auto_backup_on_exit', val.toString());
+  };
+
+  const handlePickFolder = async () => {
+    const folderName = await pickBackupFolder();
+    if (folderName) {
+      setSelectedFolderName(folderName);
+      setFolderBackupEnabledState(true);
+      setFolderBackupEnabled(true);
+    }
+  };
+
+  const handleClearFolder = () => {
+    clearFolderSelection();
+    setSelectedFolderName(null);
+    setFolderBackupEnabledState(false);
+  };
+
+  const handleToggleFolderBackup = (val: boolean) => {
+    if (val && !selectedFolderName) {
+      // Must pick a folder first
+      handlePickFolder();
+      return;
+    }
+    setFolderBackupEnabledState(val);
+    setFolderBackupEnabled(val);
+  };
+
+  const handleMaxBackupsChange = (val: number) => {
+    setMaxBackupsKeepState(val);
+    setMaxBackupsToKeep(val);
   };
 
   const handleDeleteBackup = async (id: number) => {
@@ -248,8 +305,131 @@ export const Settings = () => {
     setLocalBackups(list);
   };
 
+  async function hashPassword(password: string, salt: string = 'sm_salt_2025'): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + salt);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  const loadEmployees = async () => {
+    if (!db) return;
+    try {
+      const docs = await db.users.find().exec();
+      setEmployees(docs.map(d => d.toJSON()));
+    } catch (err) {
+      console.error('Failed to load employees:', err);
+    }
+  };
+
+  const handleAddEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmpError('');
+    setEmpSuccess('');
+
+    if (!newUsername || !newDisplayName || !newPassword) return;
+    if (newPassword.length < 6) {
+      setEmpError(t('password_too_short') || 'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+
+    const usernameClean = newUsername.toLowerCase().trim();
+    const exists = employees.some(emp => emp.username === usernameClean);
+    if (exists) {
+      setEmpError(t('username_exists') || 'اسم المستخدم موجود بالفعل');
+      return;
+    }
+
+    try {
+      const pwdHash = await hashPassword(newPassword);
+      const userId = 'user-' + Math.random().toString(36).substring(2, 11);
+      await db.users.insert({
+        user_id: userId,
+        username: usernameClean,
+        password_hash: pwdHash,
+        display_name: newDisplayName,
+        role: newRole,
+        branch_id: '',
+        created_at: new Date().toISOString(),
+        is_active: true
+      });
+
+      setEmpSuccess(t('employee_added_success') || 'تم إضافة الموظف بنجاح!');
+      setNewUsername('');
+      setNewDisplayName('');
+      setNewPassword('');
+      await loadEmployees();
+    } catch (err) {
+      console.error(err);
+      setEmpError(t('employee_add_failed') || 'فشل إضافة الموظف');
+    }
+  };
+
+  const handleToggleUserActive = async (userId: string, currentStatus: boolean) => {
+    if (userId === currentUser?.user_id) {
+      alert(t('cannot_disable_self') || 'لا يمكنك تعطيل حسابك الحالي!');
+      return;
+    }
+    try {
+      const userDoc = await db.users.findOne(userId).exec();
+      if (userDoc) {
+        await userDoc.incrementalPatch({ is_active: !currentStatus });
+        await loadEmployees();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleChangeUserPassword = async (userId: string) => {
+    if (!changePasswordVal || changePasswordVal.length < 6) {
+      alert(t('password_too_short') || 'كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+    try {
+      const userDoc = await db.users.findOne(userId).exec();
+      if (userDoc) {
+        const newHash = await hashPassword(changePasswordVal);
+        await userDoc.incrementalPatch({ password_hash: newHash });
+        alert(t('password_changed_success') || 'تم تغيير كلمة المرور بنجاح!');
+        setEditingPasswordUserId(null);
+        setChangePasswordVal('');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to change password');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, username: string) => {
+    if (username === 'admin') {
+      alert(t('cannot_delete_default_admin') || 'لا يمكن حذف حساب الأدمن الرئيسي!');
+      return;
+    }
+    if (userId === currentUser?.user_id) {
+      alert(t('cannot_delete_self') || 'لا يمكنك حذف حسابك الحالي!');
+      return;
+    }
+    if (!window.confirm(t('confirm_delete_user') || `هل أنت متأكد من حذف حساب الموظف ${username} نهائياً؟`)) {
+      return;
+    }
+    try {
+      const userDoc = await db.users.findOne(userId).exec();
+      if (userDoc) {
+        await userDoc.remove();
+        await loadEmployees();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     loadLocalBackupsList();
+    if (isAdmin) {
+      loadEmployees();
+    }
     
     const handleBackupCompleted = () => {
       loadLocalBackupsList();
@@ -258,7 +438,7 @@ export const Settings = () => {
     return () => {
       window.removeEventListener('auto_backup_completed', handleBackupCompleted);
     };
-  }, []);
+  }, [isAdmin]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
@@ -294,7 +474,7 @@ export const Settings = () => {
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">{t('backup_targets')}</label>
                         <div className="space-y-2">
                             <label className="flex items-center gap-3 cursor-pointer text-sm">
-                                <input 
+                                <input
                                     type="checkbox"
                                     checked={autoBackupLocal}
                                     onChange={(e) => handleToggleAutoBackupLocal(e.target.checked)}
@@ -304,7 +484,7 @@ export const Settings = () => {
                             </label>
 
                             <label className="flex items-center gap-3 cursor-pointer text-sm">
-                                <input 
+                                <input
                                     type="checkbox"
                                     checked={autoBackupDownloadFile}
                                     onChange={(e) => handleToggleAutoBackupDownloadFile(e.target.checked)}
@@ -312,6 +492,23 @@ export const Settings = () => {
                                 />
                                 <span>{t('backup_target_download')}</span>
                             </label>
+
+                            {/* Folder backup target */}
+                            {folderSupported ? (
+                              <label className="flex items-center gap-3 cursor-pointer text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={folderBackupEnabled}
+                                    onChange={(e) => handleToggleFolderBackup(e.target.checked)}
+                                    className="rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)] w-4 h-4"
+                                />
+                                <span>{t('backup_target_folder')}</span>
+                              </label>
+                            ) : (
+                              <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-2 rounded-lg">
+                                ⚠️ {t('folder_not_supported')}
+                              </p>
+                            )}
                         </div>
                     </div>
 
@@ -323,6 +520,8 @@ export const Settings = () => {
                             onChange={(e) => handleBackupIntervalChange(e.target.value)}
                             className="p-2 rounded-lg bg-white dark:bg-[#16171d] border border-black/10 dark:border-white/10 outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all cursor-pointer text-sm w-full sm:w-64"
                         >
+                            <option value="5">{t('interval_5m') || '5 دقائق'}</option>
+                            <option value="10">{t('interval_10m') || '10 دقائق'}</option>
                             <option value="15">{t('interval_15m')}</option>
                             <option value="30">{t('interval_30m')}</option>
                             <option value="60">{t('interval_1h')}</option>
@@ -332,6 +531,75 @@ export const Settings = () => {
                             <option value="1440">{t('interval_24h')}</option>
                         </select>
                     </div>
+
+                    {/* Folder Backup Panel — shown when folder target is enabled or folder is already selected */}
+                    {folderSupported && (folderBackupEnabled || selectedFolderName) && (
+                        <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-3">
+                            <div className="flex items-center gap-2">
+                                <FolderOpen size={18} className="text-purple-500" />
+                                <h4 className="font-semibold text-sm">{t('folder_backup_section')}</h4>
+                            </div>
+
+                            <p className="text-xs text-gray-500">{t('folder_backup_desc')}</p>
+
+                            {/* Current folder name */}
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex-1 px-3 py-2 bg-black/5 dark:bg-white/5 rounded-lg text-sm font-mono truncate">
+                                    {selectedFolderName
+                                        ? `📁 ${selectedFolderName}`
+                                        : <span className="text-gray-400">{t('no_folder_selected')}</span>
+                                    }
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handlePickFolder}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-[var(--color-primary)] text-white text-sm font-medium rounded-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                                >
+                                    <FolderOpen size={14} />
+                                    {selectedFolderName ? t('change_folder_btn') : t('select_folder_btn')}
+                                </button>
+                                {selectedFolderName && (
+                                    <button
+                                        type="button"
+                                        onClick={handleClearFolder}
+                                        className="flex items-center gap-1.5 px-3 py-2 border border-red-400 text-red-500 text-sm font-medium rounded-lg hover:bg-red-500/10 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                                    >
+                                        <FolderX size={14} />
+                                        {t('clear_folder_btn')}
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Max backups to keep */}
+                            <div className="flex items-center gap-3">
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                    {t('max_backups_keep')}:
+                                </label>
+                                <select
+                                    value={maxBackupsKeep}
+                                    onChange={(e) => handleMaxBackupsChange(Number(e.target.value))}
+                                    className="p-1.5 rounded-lg bg-white dark:bg-[#16171d] border border-black/10 dark:border-white/10 text-sm cursor-pointer"
+                                >
+                                    <option value={3}>3</option>
+                                    <option value={5}>5</option>
+                                    <option value={7}>7</option>
+                                    <option value={10}>10</option>
+                                    <option value={15}>15</option>
+                                    <option value={20}>20</option>
+                                </select>
+                            </div>
+
+                            {/* Google Drive tip */}
+                            <div className="text-xs text-purple-700 dark:text-purple-300 bg-purple-500/10 px-3 py-2 rounded-lg">
+                                {t('folder_backup_tip')}
+                            </div>
+
+                            {/* Permission note */}
+                            <p className="text-xs text-gray-400">
+                                🔒 {t('folder_backup_permission_note')}
+                            </p>
+                        </div>
+                    )}
 
                     {/* Exit/Close Selection */}
                     <label className="flex items-center gap-3 cursor-pointer text-sm pt-2 border-t border-black/5 dark:border-white/5">
@@ -699,6 +967,169 @@ export const Settings = () => {
             )}
         </form>
       </div>
+
+      {/* Employee Management Card */}
+      {isAdmin && (
+        <div className="bg-white dark:bg-[#1f2028] p-6 rounded-xl shadow-sm border border-black/10 dark:border-white/10 mt-8 space-y-6">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-black/5 dark:border-white/5">
+              <UserCheck className="text-[var(--color-primary)]" size={28} />
+              <h3 className="text-xl font-semibold">{t('manage_employees') || 'إدارة الموظفين والورديات'}</h3>
+          </div>
+
+          {/* Add Employee Form */}
+          <div className="p-4 bg-black/5 dark:bg-white/5 rounded-xl space-y-4 border border-black/5 dark:border-white/5">
+              <h4 className="font-semibold text-base">{t('add_new_employee') || 'إضافة موظف جديد'}</h4>
+              <form onSubmit={handleAddEmployee} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                  <div>
+                      <label className="block text-xs font-medium mb-1">{t('display_name_label') || 'الاسم الكامل'}</label>
+                      <input 
+                          type="text"
+                          required
+                          value={newDisplayName}
+                          onChange={(e) => setNewDisplayName(e.target.value)}
+                          placeholder="e.g. محمد علي"
+                          className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-black/10 dark:border-white/10 outline-none text-sm"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-xs font-medium mb-1">{t('username_label') || 'اسم المستخدم (لتسجيل الدخول)'}</label>
+                      <input 
+                          type="text"
+                          required
+                          value={newUsername}
+                          onChange={(e) => setNewUsername(e.target.value)}
+                          placeholder="e.g. mohamed"
+                          className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-black/10 dark:border-white/10 outline-none text-sm"
+                      />
+                  </div>
+                  <div>
+                      <label className="block text-xs font-medium mb-1">{t('role') || 'الدور'}</label>
+                      <select 
+                          value={newRole}
+                          onChange={(e) => setNewRole(e.target.value as any)}
+                          className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-black/10 dark:border-white/10 outline-none text-sm cursor-pointer"
+                      >
+                          <option value="cashier">{t('role_cashier') || 'كاشير'}</option>
+                          <option value="manager">{t('role_manager') || 'مدير'}</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block text-xs font-medium mb-1">{t('password') || 'كلمة المرور'}</label>
+                      <input 
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="******"
+                          className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-black/10 dark:border-white/10 outline-none text-sm"
+                      />
+                  </div>
+                  <div className="md:col-span-2 lg:col-span-4 flex justify-end">
+                      <button 
+                          type="submit"
+                          className="px-6 py-2 bg-[var(--color-primary)] text-white font-semibold rounded-lg hover:brightness-110 active:scale-95 transition-all text-sm cursor-pointer"
+                      >
+                          {t('add_employee_btn') || 'إضافة موظف'}
+                      </button>
+                  </div>
+              </form>
+              {empSuccess && (
+                  <div className="text-sm text-green-600 bg-green-500/10 p-2.5 rounded-lg font-medium">
+                      {empSuccess}
+                  </div>
+              )}
+              {empError && (
+                  <div className="text-sm text-red-600 bg-red-500/10 p-2.5 rounded-lg font-medium">
+                      {empError}
+                  </div>
+              )}
+          </div>
+
+          {/* List of current employees */}
+          <div className="space-y-3">
+              <h4 className="font-semibold text-base">{t('current_employees') || 'الموظفون الحاليون'}</h4>
+              <div className="overflow-x-auto border border-black/10 dark:border-white/10 rounded-lg">
+                  <table className="w-full text-sm text-right">
+                      <thead className="bg-black/5 dark:bg-white/5 text-xs uppercase border-b border-black/10 dark:border-white/10">
+                          <tr>
+                              <th scope="col" className="px-4 py-3">{t('display_name_label') || 'الاسم الكامل'}</th>
+                              <th scope="col" className="px-4 py-3">{t('username_label') || 'اسم المستخدم'}</th>
+                              <th scope="col" className="px-4 py-3">{t('role') || 'الدور'}</th>
+                              <th scope="col" className="px-4 py-3 text-center">{t('status') || 'الحالة'}</th>
+                              <th scope="col" className="px-4 py-3 text-center">{t('actions') || 'إجراءات'}</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                          {employees.map((emp) => (
+                              <tr key={emp.user_id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+                                  <td className="px-4 py-3 font-semibold">{emp.display_name}</td>
+                                  <td className="px-4 py-3 font-mono text-xs">{emp.username}</td>
+                                  <td className="px-4 py-3 text-xs">
+                                      {emp.role === 'admin' ? (t('role_admin') || 'أدمن') : emp.role === 'manager' ? (t('role_manager') || 'مدير') : (t('role_cashier') || 'كاشير')}
+                                  </td>
+                                  <td className="px-4 py-3 text-center">
+                                      <button
+                                          onClick={() => handleToggleUserActive(emp.user_id, emp.is_active)}
+                                          disabled={emp.user_id === currentUser?.user_id}
+                                          className={`px-2 py-1 rounded text-xs font-semibold disabled:opacity-50 cursor-pointer ${
+                                              emp.is_active 
+                                                  ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
+                                                  : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                                          }`}
+                                      >
+                                          {emp.is_active ? (t('active') || 'نشط') : (t('disabled') || 'معطل')}
+                                      </button>
+                                  </td>
+                                  <td className="px-4 py-3 text-center text-xs">
+                                      <div className="flex items-center justify-center gap-3">
+                                          {editingPasswordUserId === emp.user_id ? (
+                                              <div className="flex items-center gap-2">
+                                                  <input 
+                                                      type="password"
+                                                      value={changePasswordVal}
+                                                      onChange={(e) => setChangePasswordVal(e.target.value)}
+                                                      placeholder="New password"
+                                                      className="px-2 py-1 text-xs rounded bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none w-28"
+                                                  />
+                                                  <button
+                                                      onClick={() => handleChangeUserPassword(emp.user_id)}
+                                                      className="text-green-600 font-bold hover:underline"
+                                                  >
+                                                      {t('save') || 'حفظ'}
+                                                  </button>
+                                                  <button
+                                                      onClick={() => { setEditingPasswordUserId(null); setChangePasswordVal(''); }}
+                                                      className="text-gray-500 hover:underline"
+                                                  >
+                                                      {t('cancel') || 'إلغاء'}
+                                                  </button>
+                                              </div>
+                                          ) : (
+                                              <button
+                                                  onClick={() => setEditingPasswordUserId(emp.user_id)}
+                                                  className="text-[var(--color-primary)] hover:underline"
+                                              >
+                                                  🔑 {t('change_password') || 'تغيير كلمة المرور'}
+                                              </button>
+                                          )}
+                                          {emp.username !== 'admin' && emp.user_id !== currentUser?.user_id && (
+                                              <button
+                                                  onClick={() => handleDeleteUser(emp.user_id, emp.username)}
+                                                  className="text-red-500 hover:underline"
+                                              >
+                                                  ❌ {t('delete') || 'حذف'}
+                                              </button>
+                                          )}
+                                      </div>
+                                  </td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

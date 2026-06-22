@@ -177,7 +177,7 @@ export const Dashboard = () => {
       expiringProducts,
       expiredProducts,
     };
-  }, [data, t, i18n.language]);
+  }, [data, t, i18n]);
 
   const fmt = (n: number) => formatCurrency(n);
 

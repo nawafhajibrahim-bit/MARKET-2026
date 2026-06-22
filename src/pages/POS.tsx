@@ -104,15 +104,10 @@ export const POS = () => {
 
   // Keyboard shortcuts (refs avoid stale closures and dependency issues)
   const cartRef = useRef(cart);
-  cartRef.current = cart;
   const selectedCartIndexRef = useRef(selectedCartIndex);
-  selectedCartIndexRef.current = selectedCartIndex;
   const showModalRef = useRef(showCheckoutModal);
-  showModalRef.current = showCheckoutModal;
   const completedRef = useRef(completedInvoice);
-  completedRef.current = completedInvoice;
   const tRef = useRef(t);
-  tRef.current = t;
   const handlersRef = useRef({
     handleQuantityChange,
     handleRemoveFromCart,
@@ -122,15 +117,24 @@ export const POS = () => {
     setSelectedCartIndex,
     setSearchTerm,
   });
-  handlersRef.current = {
-    handleQuantityChange,
-    handleRemoveFromCart,
-    triggerNotification,
-    setPaymentType,
-    setShowCheckoutModal,
-    setSelectedCartIndex,
-    setSearchTerm,
-  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    cartRef.current = cart;
+    selectedCartIndexRef.current = selectedCartIndex;
+    showModalRef.current = showCheckoutModal;
+    completedRef.current = completedInvoice;
+    tRef.current = t;
+    handlersRef.current = {
+      handleQuantityChange,
+      handleRemoveFromCart,
+      triggerNotification,
+      setPaymentType,
+      setShowCheckoutModal,
+      setSelectedCartIndex,
+      setSearchTerm,
+    };
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -321,7 +325,7 @@ export const POS = () => {
       }> = [];
 
       // 1. Group and check stock requirements
-      const stockRequirements: Record<string, { doc: any; totalDeduct: number; nameAr: string; nameEn: string; costPrice: number }> = {};
+      const stockRequirements: Record<string, { doc: import('rxdb').RxDocument<ProductDocType>; totalDeduct: number; nameAr: string; nameEn: string; costPrice: number }> = {};
       
       for (const item of cart) {
         const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;

@@ -105,9 +105,7 @@ export const LoginScreen: React.FC = () => {
           </button>
         </form>
 
-        <div className="text-center text-xs text-gray-400">
-          <p>Default: admin / admin</p>
-        </div>
+
       </div>
     </div>
   );

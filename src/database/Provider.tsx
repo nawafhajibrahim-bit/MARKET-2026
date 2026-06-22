@@ -6,7 +6,7 @@ const DbContext = createContext<RxDatabase | null>(null);
 
 export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [db, setDb] = useState<RxDatabase | null>(null);
-    const [error, setError] = useState<any>(null);
+    const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -19,7 +19,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             } catch (err) {
                 console.error('Failed to initialize database', err);
                 if (isMounted) {
-                    setError(err);
+                    setError(err instanceof Error ? err : new Error(String(err)));
                 }
             }
         };

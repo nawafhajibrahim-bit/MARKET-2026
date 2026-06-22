@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Per-license rate limiting (in-memory, per-instance).
 // NOTE: In a serverless environment this resets on cold starts.
 // For distributed protection, use Vercel KV or Upstash Redis.

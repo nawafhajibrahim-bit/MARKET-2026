@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Layout } from './components/Layout';
@@ -12,13 +12,30 @@ import { SalesHistory } from './pages/SalesHistory';
 import { LoginScreen } from './pages/Login';
 import { LicenseInterceptor } from './components/LicenseInterceptor';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ForcePasswordChange } from './components/ForcePasswordChange';
+import { DevReset } from './pages/DevReset';
 import { useAuth } from './contexts/AuthContext';
 
 import { AutoBackupRunner } from './components/AutoBackupRunner';
 
 // Route guard: only authenticated users
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, currentUser } = useAuth();
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      // Check if this user has ever changed the password from default
+      const hasChanged = localStorage.getItem(`sm_pwd_changed_${currentUser.user_id}`);
+      // We detect default password by absence of the flag — only for admin role
+      if (!hasChanged && currentUser.role === 'admin') {
+        setNeedsPasswordChange(true);
+      } else {
+        setNeedsPasswordChange(false);
+      }
+    }
+  }, [currentUser]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -29,7 +46,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return <LoginScreen />;
   }
-  return <>{children}</>;
+  return (
+    <>
+      {needsPasswordChange && (
+        <ForcePasswordChange onDone={() => setNeedsPasswordChange(false)} />
+      )}
+      {children}
+    </>
+  );
 }
 
 // Route guard: only admin/manager
@@ -60,6 +84,9 @@ function App() {
       <AutoBackupRunner />
       <BrowserRouter>
         <Routes>
+          {/* Hidden developer recovery route — no auth, no license check */}
+          <Route path="/dev-reset" element={<DevReset />} />
+
           <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
             {/* Admin route - protected by manager/admin role */}
             <Route path="admin" element={<AdminGuard><Admin /></AdminGuard>} />

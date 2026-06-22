@@ -109,36 +109,38 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                 const res = await fetch('/api/verify-license', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ license_key })
+                    body: JSON.stringify({ license_key, hw_fingerprint: hwFingerprint })
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.active) {
-                        const newSyncTime = new Date().toISOString();
-                        const tokenPayload = JSON.stringify({ license_key, hw_fingerprint: hwFingerprint });
-                        const newActivationToken = await encryptData(tokenPayload, hwFingerprint);
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.active) {
+                    const newSyncTime = new Date().toISOString();
+                    const tokenPayload = JSON.stringify({ license_key, hw_fingerprint: hwFingerprint });
+                    const newActivationToken = await encryptData(tokenPayload, hwFingerprint);
 
-                        await configDoc.incrementalPatch({ 
-                          offline_grace_days_left: 5,
-                          last_sync_timestamp: newSyncTime,
-                          activation_token: newActivationToken,
-                          clock_tamper_detected: false
-                        });
+                    await configDoc.incrementalPatch({ 
+                      offline_grace_days_left: 5,
+                      last_sync_timestamp: newSyncTime,
+                      activation_token: newActivationToken,
+                      clock_tamper_detected: false
+                    });
 
-                        if (isMounted) {
-                          setWarningMessage(null);
-                          setIsAuthorized(true);
-                        }
-                        return;
-                    } else {
-                        await configDoc.incrementalPatch({ activation_status: false });
-                        if (isMounted) setIsAuthorized(false);
-                        return;
+                    if (isMounted) {
+                      setWarningMessage(null);
+                      setIsAuthorized(true);
                     }
+                    return;
+                } else {
+                    const errorType = data.error || 'license_verify_failed';
+                    await configDoc.incrementalPatch({ activation_status: false });
+                    if (isMounted) {
+                        setErrorMsg(t(errorType) || errorType);
+                        setIsAuthorized(false);
+                    }
+                    return;
                 }
-            } catch {
-                console.warn('Network error during license check, falling back to offline grace.');
+            } catch (err) {
+                console.warn('Network error during license check, falling back to offline grace.', err);
             }
         }
 
@@ -233,41 +235,38 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           const res = await fetch('/api/verify-license', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ license_key: licenseKey })
+              body: JSON.stringify({ license_key: licenseKey, hw_fingerprint: hwFingerprint })
           });
 
-          if (res.ok) {
-              const data = await res.json();
-              if (data.active) {
-                  await db.system_config.insert({
-                      id: 'config',
-                      license_key: licenseKey,
-                      activation_status: true,
-                      offline_grace_days_left: 5,
-                      last_sync_timestamp: new Date().toISOString(),
-                      hardware_fingerprint: hwFingerprint,
-                      activation_token: activationToken,
-                      clock_tamper_detected: false
-                  }).catch(async () => {
-                      const existing = await db.system_config.findOne('config').exec();
-                      if (existing) {
-                          await existing.incrementalPatch({ 
-                            license_key: licenseKey, 
-                            activation_status: true, 
-                            offline_grace_days_left: 5,
-                            last_sync_timestamp: new Date().toISOString(),
-                            hardware_fingerprint: hwFingerprint,
-                            activation_token: activationToken,
-                            clock_tamper_detected: false
-                          });
-                      }
-                  });
-                  setIsAuthorized(true);
-              } else {
-                  setErrorMsg(t('license_invalid'));
-              }
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.active) {
+              await db.system_config.insert({
+                  id: 'config',
+                  license_key: licenseKey,
+                  activation_status: true,
+                  offline_grace_days_left: 5,
+                  last_sync_timestamp: new Date().toISOString(),
+                  hardware_fingerprint: hwFingerprint,
+                  activation_token: activationToken,
+                  clock_tamper_detected: false
+              }).catch(async () => {
+                  const existing = await db.system_config.findOne('config').exec();
+                  if (existing) {
+                      await existing.incrementalPatch({ 
+                        license_key: licenseKey, 
+                        activation_status: true, 
+                        offline_grace_days_left: 5,
+                        last_sync_timestamp: new Date().toISOString(),
+                        hardware_fingerprint: hwFingerprint,
+                        activation_token: activationToken,
+                        clock_tamper_detected: false
+                      });
+                  }
+              });
+              setIsAuthorized(true);
           } else {
-              setErrorMsg(t('license_verify_failed'));
+              const errorType = data.error || 'license_invalid';
+              setErrorMsg(t(errorType) || errorType);
           }
       } catch {
           setErrorMsg(t('license_error'));

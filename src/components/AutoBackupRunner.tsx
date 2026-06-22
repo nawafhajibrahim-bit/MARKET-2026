@@ -1,33 +1,35 @@
 import React, { useEffect, useRef } from 'react';
 import { useDb } from '../database/Provider';
 import { saveLocalBackup } from '../services/backupStorageService';
+import { saveBackupToFolder, isFolderBackupEnabled } from '../services/folderBackupService';
 import { zipSync, strToU8 } from 'fflate';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const runAutoBackup = async (db: any) => {
+// eslint-disable-next-line react-refresh/only-export-components
+export const runAutoBackup = async (db: import('rxdb').RxDatabase) => {
     const isEnabled = localStorage.getItem('auto_backup_enabled') === 'true';
     if (!isEnabled) return;
 
     const backupLocal = localStorage.getItem('auto_backup_local') !== 'false'; // default true
     const downloadFile = localStorage.getItem('auto_backup_download_file') === 'true'; // default false
+    const folderEnabled = isFolderBackupEnabled();
 
     const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `smartmarket_backup_auto_${timestampStr}.zip`;
-
-    let backupData: Uint8Array | null = null;
 
     try {
         // Export JSON and Zip it
         const dump = await db.exportJSON();
         const uint8 = strToU8(JSON.stringify(dump));
-        backupData = zipSync({
+        const backupData = zipSync({
             'smartmarket_backup.json': uint8
         });
 
+        // Target 1: IndexedDB (inside browser)
         if (backupLocal && backupData) {
             await saveLocalBackup(filename, backupData);
         }
 
+        // Target 2: Auto-download ZIP file
         if (downloadFile && backupData) {
             const blob = new Blob([backupData as BlobPart], { type: 'application/zip' });
             const url = URL.createObjectURL(blob);
@@ -36,6 +38,12 @@ export const runAutoBackup = async (db: any) => {
             a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        // Target 3: Save to user-selected folder on device (Google Drive, Desktop, etc.)
+        if (folderEnabled && backupData) {
+            // autoPrompt=true: if permission was lost after page reload, re-prompt the user
+            await saveBackupToFolder(backupData, filename, true);
         }
 
         // Update the last run timestamp

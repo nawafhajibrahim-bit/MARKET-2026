@@ -40,8 +40,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Cleanup all timers on unmount
   useEffect(() => {
+    const currentTimers = timersRef.current;
     return () => {
-      Object.values(timersRef.current).forEach(clearTimeout);
+      Object.values(currentTimers).forEach(clearTimeout);
     };
   }, []);
 
@@ -81,6 +82,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {
