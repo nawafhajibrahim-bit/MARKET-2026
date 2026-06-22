@@ -146,7 +146,7 @@ export const userSchemaLiteral = {
         is_active: { type: 'boolean' },
     },
     required: ['user_id', 'username', 'password_hash', 'role', 'is_active'],
-    indexes: ['username', 'role', 'branch_id'],
+    indexes: ['username', 'role'],
 } as const;
 export const schemaTypedUser = toTypedRxJsonSchema(userSchemaLiteral);
 export type UserDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedUser>;
