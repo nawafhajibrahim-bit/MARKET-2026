@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useDb } from '../database/Provider';
 import { saveLocalBackup } from '../services/backupStorageService';
-import { GoogleDriveService } from '../services/GoogleDriveService';
 import { zipSync, strToU8 } from 'fflate';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,7 +9,6 @@ export const runAutoBackup = async (db: any) => {
     if (!isEnabled) return;
 
     const backupLocal = localStorage.getItem('auto_backup_local') !== 'false'; // default true
-    const backupCloud = localStorage.getItem('auto_backup_cloud') === 'true'; // default false
     const downloadFile = localStorage.getItem('auto_backup_download_file') === 'true'; // default false
 
     const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
@@ -19,53 +17,25 @@ export const runAutoBackup = async (db: any) => {
     let backupData: Uint8Array | null = null;
 
     try {
-        // 1. Export JSON and Zip it if local OR download is requested
-        if (backupLocal || downloadFile) {
-            const dump = await db.exportJSON();
-            const uint8 = strToU8(JSON.stringify(dump));
-            backupData = zipSync({
-                'smartmarket_backup.json': uint8
-            });
+        // Export JSON and Zip it
+        const dump = await db.exportJSON();
+        const uint8 = strToU8(JSON.stringify(dump));
+        backupData = zipSync({
+            'smartmarket_backup.json': uint8
+        });
 
-            if (backupLocal && backupData) {
-                await saveLocalBackup(filename, backupData);
-            }
-
-            if (downloadFile && backupData) {
-                const blob = new Blob([backupData as BlobPart], { type: 'application/zip' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
+        if (backupLocal && backupData) {
+            await saveLocalBackup(filename, backupData);
         }
 
-        // 2. Perform Cloud Backup if enabled and Google credentials exist
-        if (backupCloud) {
-            const accessToken = localStorage.getItem('google_access_token');
-            const tokenExpiry = localStorage.getItem('google_token_expiry');
-
-            if (accessToken && tokenExpiry && Date.now() < parseInt(tokenExpiry, 10)) {
-                // If local data hasn't been zipped/exported yet, do it now
-                if (!backupData) {
-                    const dump = await db.exportJSON();
-                    const uint8 = strToU8(JSON.stringify(dump));
-                    backupData = zipSync({
-                        'smartmarket_backup.json': uint8
-                    });
-                }
-                const driveService = new GoogleDriveService(accessToken);
-                const success = await driveService.backupDatabase(db);
-                if (success) {
-                    localStorage.setItem('google_backup_last_status', 'success');
-                } else {
-                    localStorage.setItem('google_backup_last_status', 'failed');
-                }
-            } else {
-                localStorage.setItem('google_backup_last_status', 'expired');
-            }
+        if (downloadFile && backupData) {
+            const blob = new Blob([backupData as BlobPart], { type: 'application/zip' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         // Update the last run timestamp

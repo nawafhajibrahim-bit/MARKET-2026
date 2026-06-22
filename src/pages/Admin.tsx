@@ -33,6 +33,7 @@ export const Admin = () => {
         },
         body: JSON.stringify({
           admin_secret: adminSecret,
+          timestamp: new Date().toISOString(),
           license_key: licenseKey,
           expiry_date: expiryDate.toISOString(),
           status: 'active',

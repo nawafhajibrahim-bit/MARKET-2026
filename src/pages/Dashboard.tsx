@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, HandCoins, AlertTriangle, ShoppingCart, Package } from 'lucide-react';
+import { TrendingUp, TrendingDown, HandCoins, AlertTriangle, ShoppingCart, Package, FileText } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { InvoiceDocType, DebtDocType, ProductDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
+import { ZReportModal } from '../components/ZReportModal';
 
 const AIEngine = React.lazy(() => import('../modules/ai/AIEngine'));
 
@@ -12,6 +13,7 @@ export const Dashboard = () => {
   const { t, i18n } = useTranslation();
   const db = useDb();
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [showZReport, setShowZReport] = useState(false);
   const [data, setData] = useState<{
     invoices: InvoiceDocType[];
     debts: DebtDocType[];
@@ -97,6 +99,20 @@ export const Dashboard = () => {
     // Low stock
     const lowStockCount = products.filter(p => p.stock_quantity <= (p.min_safety_stock ?? 0)).length;
 
+    // Expiring products (within 30 days)
+    const nowExp = new Date();
+    const thirtyDaysFromNow = new Date(nowExp.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const expiringProducts = products.filter(p => {
+      if (!p.expiry_date) return false;
+      const exp = new Date(p.expiry_date);
+      return exp <= thirtyDaysFromNow && exp >= nowExp;
+    });
+    const expiredProducts = products.filter(p => {
+      if (!p.expiry_date) return false;
+      const exp = new Date(p.expiry_date);
+      return exp < nowExp;
+    });
+
     // Build last 6 months chart data
     const monthlyMap: Record<string, { revenue: number; profit: number }> = {};
     for (let i = 5; i >= 0; i--) {
@@ -158,6 +174,8 @@ export const Dashboard = () => {
       totalProducts: products.length,
       monthlyChart,
       topProducts,
+      expiringProducts,
+      expiredProducts,
     };
   }, [data, t, i18n.language]);
 
@@ -167,12 +185,21 @@ export const Dashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{t('dashboard')}</h2>
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <div className="w-3 h-3 rounded-full bg-[var(--color-primary)] animate-pulse" />
-            {t('loading')}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowZReport(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all font-semibold text-sm cursor-pointer"
+          >
+            <FileText size={16} />
+            {t('z_report')}
+          </button>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="w-3 h-3 rounded-full bg-[var(--color-primary)] animate-pulse" />
+              {t('loading')}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Summary KPI Cards */}
@@ -231,6 +258,33 @@ export const Dashboard = () => {
             </div>
           </div>
         )}
+        
+        {/* Expired products alert */}
+        {stats.expiredProducts.length > 0 && (
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+            <div className="p-2.5 bg-red-500/20 rounded-xl flex-shrink-0">
+              <AlertTriangle size={20} className="text-red-500" />
+            </div>
+            <div>
+              <p className="font-semibold text-red-600 dark:text-red-400">{t('expired_products_alert_title') || 'منتجات منتهية الصلاحية'}</p>
+              <p className="text-sm text-red-500">{t('expired_products_alert_desc', { count: stats.expiredProducts.length }) || `${stats.expiredProducts.length} منتجات تجاوزت تاريخ الانتهاء`}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Expiring soon products alert */}
+        {stats.expiringProducts.length > 0 && (
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+            <div className="p-2.5 bg-yellow-500/20 rounded-xl flex-shrink-0">
+              <AlertTriangle size={20} className="text-yellow-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-yellow-700 dark:text-yellow-400">{t('expiring_products_alert_title') || 'منتجات قاربت على الانتهاء'}</p>
+              <p className="text-sm text-yellow-600">{t('expiring_products_alert_desc', { count: stats.expiringProducts.length }) || `${stats.expiringProducts.length} منتجات ستنتهي خلال 30 يوماً`}</p>
+            </div>
+          </div>
+        )}
+        
         <div className="flex items-center gap-4 p-4 rounded-xl bg-white dark:bg-[#1f2028] border border-black/5 dark:border-white/5 shadow-sm">
           <div className="p-2.5 bg-[var(--color-primary)]/10 rounded-xl flex-shrink-0">
             <Package size={20} className="text-[var(--color-primary)]" />
@@ -298,6 +352,14 @@ export const Dashboard = () => {
         <React.Suspense fallback={<div className="p-4 text-center">{t('ai_loading')}</div>}>
           <AIEngine />
         </React.Suspense>
+      )}
+
+      {showZReport && (
+        <ZReportModal
+          invoices={data.invoices}
+          products={data.products}
+          onClose={() => setShowZReport(false)}
+        />
       )}
     </div>
   );

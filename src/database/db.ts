@@ -1,17 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createRxDatabase, addRxPlugin, removeRxDatabase } from 'rxdb';
+import { createRxDatabase, addRxPlugin } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 import { RxDBQueryBuilderPlugin } from 'rxdb/plugins/query-builder';
 import { RxDBUpdatePlugin } from 'rxdb/plugins/update';
 import { RxDBJsonDumpPlugin } from 'rxdb/plugins/json-dump';
+import { RxDBMigrationPlugin } from 'rxdb/plugins/migration-schema';
 
 import {
     productSchema,
     unitSchema,
     invoiceSchema,
     debtSchema,
-    systemConfigSchema
+    systemConfigSchema,
+    userSchema,
+    branchSchema
 } from './schema';
 
 if (import.meta.env.DEV) {
@@ -22,6 +25,7 @@ if (import.meta.env.DEV) {
 addRxPlugin(RxDBQueryBuilderPlugin);
 addRxPlugin(RxDBUpdatePlugin);
 addRxPlugin(RxDBJsonDumpPlugin);
+addRxPlugin(RxDBMigrationPlugin);
 
 import type { RxDatabase } from 'rxdb';
 
@@ -38,74 +42,61 @@ export const initDB = async (): Promise<RxDatabase> => {
             storage: getRxStorageDexie()
         });
 
-        try {
-            // Create the database
-            const db = await createRxDatabase({
-                name: dbName,
-                storage,
-                ignoreDuplicate: import.meta.env.DEV // Allowed in dev-mode for React Strict Mode, disabled in production
-            });
+        const db = await createRxDatabase({
+            name: dbName,
+            storage,
+            ignoreDuplicate: import.meta.env.DEV // Allowed in dev-mode for React Strict Mode, disabled in production
+        });
 
-            // Add collections
-            await db.addCollections({
-                products: {
-                    schema: productSchema
-                },
-                units: {
-                    schema: unitSchema
-                },
-                invoices: {
-                    schema: invoiceSchema
-                },
-                debts: {
-                    schema: debtSchema
-                },
-                system_config: {
-                    schema: systemConfigSchema
+        // Add collections with migration strategies ready for future schema changes.
+        // IMPORTANT: Never auto-delete the database on any error — user data must be preserved.
+        // If a schema mismatch occurs after an app update, the user must export data,
+        // clear site data, re-import, and try again. Data loss is unacceptable.
+        await db.addCollections({
+            products: {
+                schema: productSchema,
+                migrationStrategies: {
+                    // 1: (oldDoc) => oldDoc,  // example: migrate v0 → v1 (identity)
                 }
-            });
-
-            await seedDemoData(db);
-            return db;
-        } catch (err) {
-            console.warn('Database initialization failed (likely schema mismatch). Recreating database...', err);
-            try {
-                await removeRxDatabase(dbName, storage);
-            } catch (removeErr) {
-                console.error('Failed to remove database', removeErr);
+            },
+            units: {
+                schema: unitSchema,
+                migrationStrategies: {}
+            },
+            invoices: {
+                schema: invoiceSchema,
+                migrationStrategies: {}
+            },
+            debts: {
+                schema: debtSchema,
+                migrationStrategies: {}
+            },
+            system_config: {
+                schema: systemConfigSchema,
+                migrationStrategies: {}
+            },
+            users: {
+                schema: userSchema,
+                migrationStrategies: {}
+            },
+            branches: {
+                schema: branchSchema,
+                migrationStrategies: {}
             }
+        });
 
-            // Retry creation from scratch
-            const db = await createRxDatabase({
-                name: dbName,
-                storage,
-                ignoreDuplicate: import.meta.env.DEV
-            });
-
-            await db.addCollections({
-                products: {
-                    schema: productSchema
-                },
-                units: {
-                    schema: unitSchema
-                },
-                invoices: {
-                    schema: invoiceSchema
-                },
-                debts: {
-                    schema: debtSchema
-                },
-                system_config: {
-                    schema: systemConfigSchema
-                }
-            });
-
-            await seedDemoData(db);
-            return db;
-        }
+        await seedDemoData(db);
+        return db;
     })().catch((err) => {
         dbPromise = null; // Reset promise on total failure to allow subsequent retries
-        throw err;
+        // CRITICAL: Do NOT auto-delete the database. Preserve user data at all costs.
+        console.error('Database initialization failed. DATA HAS NOT BEEN DELETED.', err);
+        throw new Error(
+            'Database initialization failed — your data is safe. ' +
+            'Possible causes: schema mismatch after an app update, or IndexedDB being blocked by the browser. ' +
+            'If you just updated the app, please export your data first, then clear site data and re-import. ' +
+            'Technical details: ' + (err instanceof Error ? err.message : String(err))
+        );
     });
 
     return dbPromise;

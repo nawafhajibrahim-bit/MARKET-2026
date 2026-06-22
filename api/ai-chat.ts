@@ -1,6 +1,7 @@
-// Vercel Serverless Function to handle proxying AI requests to Groq with rate limiting and license validation
-
-let requestTimestamps: number[] = [];
+// Per-license rate limiting (in-memory, per-instance).
+// NOTE: In a serverless environment this resets on cold starts.
+// For distributed protection, use Vercel KV or Upstash Redis.
+const licenseRateLimits: Record<string, number[]> = {};
 
 type LicenseRecord = {
     expiry_date: string;
@@ -12,9 +13,19 @@ export default async function handler(req: any, res: any) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { prompt, model, licenseKey } = req.body;
+    const { prompt, model, licenseKey, timestamp } = req.body;
     if (!prompt) {
         return res.status(400).json({ error: 'Missing prompt' });
+    }
+    if (!timestamp) {
+        return res.status(400).json({ error: 'Missing request timestamp' });
+    }
+
+    // Validate timestamp to prevent replay attacks (±2 minutes)
+    const now = Date.now();
+    const reqTime = new Date(timestamp).getTime();
+    if (isNaN(reqTime) || Math.abs(now - reqTime) > 2 * 60 * 1000) {
+        return res.status(401).json({ error: 'Request timestamp invalid or expired. Please sync your system clock.' });
     }
 
     // 1. License validation
@@ -74,17 +85,20 @@ export default async function handler(req: any, res: any) {
         }
     }
 
-    // 2. Rate Limiting check (basic per-instance protection)
-    const now = Date.now();
-    requestTimestamps = requestTimestamps.filter(t => now - t < 60000); // keep only last 60s
+    // 2. Rate Limiting check (per-license, per-instance)
+    const key = licenseKey || 'anonymous';
+    if (!licenseRateLimits[key]) {
+        licenseRateLimits[key] = [];
+    }
+    licenseRateLimits[key] = licenseRateLimits[key].filter(t => now - t < 60000);
 
-    if (requestTimestamps.length >= 30) {
+    if (licenseRateLimits[key].length >= 30) {
         return res.status(429).json({ 
-            error: 'AI Server rate limit exceeded (Max 30 requests/minute). Please wait or enter your custom key in Settings.' 
+            error: 'AI Server rate limit exceeded (Max 30 requests/minute per license). Please wait or enter your custom key in Settings.' 
         });
     }
 
-    requestTimestamps.push(now);
+    licenseRateLimits[key].push(now);
 
     // 3. Fetch Developer master API key
     const GROQ_API_KEY = process.env.GROQ_API_KEY;

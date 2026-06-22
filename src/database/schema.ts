@@ -125,3 +125,53 @@ export const systemConfigSchemaLiteral = {
 export const schemaTypedSystemConfig = toTypedRxJsonSchema(systemConfigSchemaLiteral);
 export type SystemConfigDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedSystemConfig>;
 export const systemConfigSchema: RxJsonSchema<SystemConfigDocType> = systemConfigSchemaLiteral;
+
+
+// ───────────────────────────────────────────────
+// User schema (RBAC)
+// ───────────────────────────────────────────────
+export const userSchemaLiteral = {
+    title: 'user schema',
+    version: 0,
+    primaryKey: 'user_id',
+    type: 'object',
+    properties: {
+        user_id: { type: 'string', maxLength: 100 },
+        username: { type: 'string', maxLength: 100 },
+        password_hash: { type: 'string', maxLength: 256 }, // bcrypt or PBKDF2 hash
+        display_name: { type: 'string' },
+        role: { type: 'string', maxLength: 50 }, // 'admin' | 'cashier' | 'manager'
+        branch_id: { type: 'string', maxLength: 100 }, // nullable for global admins
+        created_at: { type: 'string' },
+        is_active: { type: 'boolean' },
+    },
+    required: ['user_id', 'username', 'password_hash', 'role', 'is_active'],
+    indexes: ['username', 'role', 'branch_id'],
+} as const;
+export const schemaTypedUser = toTypedRxJsonSchema(userSchemaLiteral);
+export type UserDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedUser>;
+export const userSchema: RxJsonSchema<UserDocType> = userSchemaLiteral;
+
+
+// ───────────────────────────────────────────────
+// Branch schema (Multi-Branch)
+// ───────────────────────────────────────────────
+export const branchSchemaLiteral = {
+    title: 'branch schema',
+    version: 0,
+    primaryKey: 'branch_id',
+    type: 'object',
+    properties: {
+        branch_id: { type: 'string', maxLength: 100 },
+        name: { type: 'string' },
+        address: { type: 'string' },
+        phone: { type: 'string' },
+        is_active: { type: 'boolean' },
+        created_at: { type: 'string' },
+    },
+    required: ['branch_id', 'name', 'is_active'],
+    indexes: ['name'],
+} as const;
+export const schemaTypedBranch = toTypedRxJsonSchema(branchSchemaLiteral);
+export type BranchDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedBranch>;
+export const branchSchema: RxJsonSchema<BranchDocType> = branchSchemaLiteral;

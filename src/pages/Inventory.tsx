@@ -32,6 +32,7 @@ export const Inventory = () => {
   const [salePrice, setSalePrice] = useState(0);
   const [stockQuantity, setStockQuantity] = useState(0);
   const [minSafetyStock, setMinSafetyStock] = useState(5);
+  const [expiryDate, setExpiryDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -63,6 +64,7 @@ export const Inventory = () => {
         setSalePrice(p.sale_price);
         setStockQuantity(0);
         setMinSafetyStock(p.min_safety_stock ?? 5);
+        setExpiryDate(p.expiry_date || '');
         
         const units = await db.units.find({ selector: { product_id: p.id } }).exec();
         setAdditionalUnits(units.map(u => {
@@ -88,6 +90,7 @@ export const Inventory = () => {
     setSalePrice(product.sale_price);
     setStockQuantity(0);
     setMinSafetyStock(product.min_safety_stock ?? 5);
+    setExpiryDate(product.expiry_date || '');
     
     const units = await db.units.find({ selector: { product_id: product.id } }).exec();
     setAdditionalUnits(units.map(u => {
@@ -112,6 +115,7 @@ export const Inventory = () => {
     setSalePrice(0);
     setStockQuantity(0);
     setMinSafetyStock(5);
+    setExpiryDate('');
     setAdditionalUnits([]);
     setShowModal(true);
   };
@@ -226,7 +230,8 @@ export const Inventory = () => {
             cost_price: Number(costPrice),
             sale_price: Number(salePrice),
             stock_quantity: currentStock + addedQty,
-            min_safety_stock: Number(minSafetyStock)
+            min_safety_stock: Number(minSafetyStock),
+            expiry_date: expiryDate || undefined
           });
 
           // Re-save additional units
@@ -261,7 +266,8 @@ export const Inventory = () => {
           cost_price: Number(costPrice),
           sale_price: Number(salePrice),
           stock_quantity: Number(stockQuantity),
-          min_safety_stock: Number(minSafetyStock)
+          min_safety_stock: Number(minSafetyStock),
+          expiry_date: expiryDate || undefined
         });
 
         for (const unit of additionalUnits) {
@@ -288,6 +294,7 @@ export const Inventory = () => {
       setSalePrice(0);
       setStockQuantity(0);
       setMinSafetyStock(5);
+      setExpiryDate('');
       setAdditionalUnits([]);
       setEditProductId(null);
       setShowModal(false);
@@ -649,6 +656,15 @@ export const Inventory = () => {
                     required
                     value={minSafetyStock}
                     onChange={(e) => setMinSafetyStock(Number(e.target.value))}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">{t('expiry_date_label') || 'تاريخ الانتهاء'}</label>
+                  <input 
+                    type="date" 
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
                   />
                 </div>

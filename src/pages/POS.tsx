@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer } from 'lucide-react';
+import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList } from '../utils/currency';
 import { Receipt } from '../components/Receipt';
 import { useCart } from '../hooks/useCart';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 
 interface CartItem {
   product: ProductDocType;
@@ -66,9 +67,154 @@ export const POS = () => {
     clearCart
   } = useCart(unitsMap, triggerNotification, t);
 
-  // Completed Sale & Print Preview State
   const [completedInvoice, setCompletedInvoice] = useState<CompletedInvoice | null>(null);
   const [completedCart, setCompletedCart] = useState<CartItem[]>([]);
+
+  // Selected cart item for keyboard navigation
+  const [selectedCartIndex, setSelectedCartIndex] = useState<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-select last cart item when cart changes
+  useEffect(() => {
+    if (cart.length > 0) {
+      setSelectedCartIndex(cart.length - 1);
+    } else {
+      setSelectedCartIndex(null);
+    }
+  }, [cart.length]);
+
+  // Barcode scanner support (rapid keystrokes ending in Enter)
+  useBarcodeScanner({
+    enabled: !showCheckoutModal && !completedInvoice,
+    onBarcode: (barcode) => {
+      const raw = barcode.trim().toLowerCase();
+      const match = products.find(p => p.barcode?.toLowerCase() === raw);
+      if (match) {
+        if (match.stock_quantity > 0) {
+          handleAddToCart(match);
+          triggerNotification(`${t('barcode')}: ${barcode}`, 'success');
+        } else {
+          triggerNotification(`${t('out_of_stock')}: ${match.name_ar || match.name_en || barcode}`, 'error');
+        }
+      } else {
+        triggerNotification(`${t('barcode')} ${barcode}: ${t('no_products_found')}`, 'error');
+      }
+    }
+  });
+
+  // Keyboard shortcuts (refs avoid stale closures and dependency issues)
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+  const selectedCartIndexRef = useRef(selectedCartIndex);
+  selectedCartIndexRef.current = selectedCartIndex;
+  const showModalRef = useRef(showCheckoutModal);
+  showModalRef.current = showCheckoutModal;
+  const completedRef = useRef(completedInvoice);
+  completedRef.current = completedInvoice;
+  const tRef = useRef(t);
+  tRef.current = t;
+  const handlersRef = useRef({
+    handleQuantityChange,
+    handleRemoveFromCart,
+    triggerNotification,
+    setPaymentType,
+    setShowCheckoutModal,
+    setSelectedCartIndex,
+    setSearchTerm,
+  });
+  handlersRef.current = {
+    handleQuantityChange,
+    handleRemoveFromCart,
+    triggerNotification,
+    setPaymentType,
+    setShowCheckoutModal,
+    setSelectedCartIndex,
+    setSearchTerm,
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+
+      // F1: Focus search (works everywhere)
+      if (e.key === 'F1') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // Block other shortcuts when typing in inputs
+      if (isInInput) return;
+
+      // Block when modal is open or print preview is showing
+      if (showModalRef.current || completedRef.current) return;
+
+      const h = handlersRef.current;
+      const c = cartRef.current;
+      const selIdx = selectedCartIndexRef.current;
+      const tr = tRef.current;
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (c.length > 0) {
+          h.setPaymentType('cash');
+          h.setShowCheckoutModal(true);
+        } else {
+          h.triggerNotification(tr('cart_empty'), 'error');
+        }
+        return;
+      }
+
+      if (e.key === 'F3') {
+        e.preventDefault();
+        if (c.length > 0) {
+          h.setPaymentType('debt');
+          h.setShowCheckoutModal(true);
+        } else {
+          h.triggerNotification(tr('cart_empty'), 'error');
+        }
+        return;
+      }
+
+      if (e.key === '+' || e.key === 'NumpadAdd') {
+        e.preventDefault();
+        const idx = selIdx ?? (c.length > 0 ? c.length - 1 : null);
+        if (idx !== null) h.handleQuantityChange(idx, 1);
+        return;
+      }
+
+      if (e.key === '-' || e.key === 'NumpadSubtract') {
+        e.preventDefault();
+        const idx = selIdx ?? (c.length > 0 ? c.length - 1 : null);
+        if (idx !== null) h.handleQuantityChange(idx, -1);
+        return;
+      }
+
+      if (e.key === 'Delete') {
+        e.preventDefault();
+        const idx = selIdx ?? (c.length > 0 ? c.length - 1 : null);
+        if (idx !== null) {
+          h.handleRemoveFromCart(idx);
+          h.setSelectedCartIndex(prev => {
+            if (prev === null) return null;
+            if (prev >= c.length - 1) return Math.max(0, c.length - 2);
+            return prev;
+          });
+        }
+        return;
+      }
+
+      // Esc: clear search
+      if (e.key === 'Escape') {
+        h.setSearchTerm('');
+        return;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Discount State
   const [discountEnabled, setDiscountEnabled] = useState(false);
@@ -326,12 +472,39 @@ export const POS = () => {
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input 
+            ref={searchInputRef}
             type="text" 
             placeholder={t('search_barcode')}
             className="w-full pl-12 pr-4 py-4 rounded-xl text-lg bg-white dark:bg-[#1f2028] shadow-sm border-2 border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
             autoFocus
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const rawQuery = searchTerm.trim().toLowerCase();
+                // Try exact barcode match first
+                const exactMatch = products.find(p => p.barcode?.toLowerCase() === rawQuery);
+                if (exactMatch) {
+                  if (exactMatch.stock_quantity > 0) {
+                    handleAddToCart(exactMatch);
+                    setSearchTerm('');
+                  } else {
+                    triggerNotification(t('out_of_stock'), 'error');
+                  }
+                  return;
+                }
+                // If only one filtered result, add it immediately
+                if (filteredProducts.length === 1) {
+                  const p = filteredProducts[0];
+                  if (p.stock_quantity > 0) {
+                    handleAddToCart(p);
+                    setSearchTerm('');
+                  } else {
+                    triggerNotification(t('out_of_stock'), 'error');
+                  }
+                }
+              }
+            }}
           />
         </div>
 
@@ -353,6 +526,18 @@ export const POS = () => {
                       : 'opacity-50 cursor-not-allowed'
                   }`}
                 >
+                  {/* Stock badges */}
+                  {p.stock_quantity <= 0 && (
+                    <div className="absolute top-2 end-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm">
+                      {t('out_of_stock')}
+                    </div>
+                  )}
+                  {p.stock_quantity > 0 && p.stock_quantity <= (p.min_safety_stock ?? 0) && (
+                    <div className="absolute top-2 end-2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm flex items-center gap-1">
+                      <AlertTriangle size={10} />
+                      {t('low_stock')}
+                    </div>
+                  )}
                   <div className="text-center">
                     <div className="w-14 h-14 mx-auto bg-purple-500/10 text-[var(--color-primary)] rounded-full mb-3 flex items-center justify-center">
                       <ShoppingCart size={22} />
@@ -399,7 +584,15 @@ export const POS = () => {
               const price = item.selectedUnit ? item.selectedUnit.price_per_unit : item.product.sale_price;
 
               return (
-                <div key={index} className="flex flex-col gap-2 pb-3 border-b border-black/5 dark:border-white/5">
+                <div 
+                  key={index} 
+                  onClick={() => setSelectedCartIndex(index)}
+                  className={`flex flex-col gap-2 pb-3 border-b border-black/5 dark:border-white/5 rounded-lg p-2 transition-all cursor-pointer ${
+                    selectedCartIndex === index 
+                      ? 'bg-purple-500/10 border-l-4 border-l-[var(--color-primary)] shadow-sm' 
+                      : 'hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h4 className="font-semibold text-sm line-clamp-1">{displayName}</h4>
@@ -488,6 +681,9 @@ export const POS = () => {
                <HandCoins size={18} />
                {t('debt')}
              </button>
+          </div>
+          <div className="text-[10px] text-gray-400 text-center mt-2 select-none">
+            F1: {t('search_barcode')} | F2: {t('cash')} | F3: {t('debt')} | +/- : {i18n.language === 'ar' ? 'الكمية' : 'Qty'} | Del: {t('delete_confirm_btn')}
           </div>
         </div>
       </div>

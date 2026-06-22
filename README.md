@@ -1,6 +1,6 @@
 # Smart Market
 
-Offline-first POS and inventory system built with React, TypeScript, Vite, RxDB/Dexie, PWA support, Google Drive backup, license checks, and optional Groq AI assistance.
+Offline-first POS and inventory system built with React, TypeScript, Vite, RxDB/Dexie, PWA support, local backup with timestamps, license checks, and optional Groq AI assistance.
 
 ## Local Development
 
@@ -44,7 +44,6 @@ VITE_ENABLE_DEMO_LOGIN=false
 
 Client-side:
 
-- `VITE_GOOGLE_CLIENT_ID`: Google OAuth client ID for Drive backup.
 - `VITE_ENABLE_DEMO_LOGIN`: shows or hides the temporary demo login button.
 
 Server-side Vercel API:

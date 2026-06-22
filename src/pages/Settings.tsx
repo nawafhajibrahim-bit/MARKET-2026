@@ -1,17 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CloudUpload, RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
-import { useGoogleLogin } from '@react-oauth/google';
-import { GoogleDriveService } from '../services/GoogleDriveService';
 import { useDb } from '../database/Provider';
 import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency } from '../utils/currency';
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
 import { runAutoBackup } from '../components/AutoBackupRunner';
-
-interface GoogleTokenResponse {
-  access_token: string;
-}
 
 export const Settings = () => {
   const { t } = useTranslation();
@@ -19,113 +13,11 @@ export const Settings = () => {
   
   const [isAutoBackup, setIsAutoBackup] = useState(() => localStorage.getItem('auto_backup_enabled') === 'true');
   const [autoBackupLocal, setAutoBackupLocal] = useState(() => localStorage.getItem('auto_backup_local') !== 'false');
-  const [autoBackupCloud, setAutoBackupCloud] = useState(() => localStorage.getItem('auto_backup_cloud') === 'true');
   const [autoBackupDownloadFile, setAutoBackupDownloadFile] = useState(() => localStorage.getItem('auto_backup_download_file') === 'true');
   const [autoBackupInterval, setAutoBackupInterval] = useState(() => localStorage.getItem('auto_backup_interval') || '60');
   const [autoBackupOnExit, setAutoBackupOnExit] = useState(() => localStorage.getItem('auto_backup_on_exit') !== 'false');
   const [localBackups, setLocalBackups] = useState<LocalBackup[]>([]);
-
-  const loadLocalBackupsList = async () => {
-    const list = await getLocalBackups();
-    setLocalBackups(list);
-  };
-
-  useEffect(() => {
-    loadLocalBackupsList();
-    
-    // Listen for automatic backup completion events to refresh list
-    const handleBackupCompleted = () => {
-      loadLocalBackupsList();
-    };
-    window.addEventListener('auto_backup_completed', handleBackupCompleted);
-    return () => {
-      window.removeEventListener('auto_backup_completed', handleBackupCompleted);
-    };
-  }, []);
-
-  const handleToggleAutoBackupLocal = (val: boolean) => {
-    setAutoBackupLocal(val);
-    localStorage.setItem('auto_backup_local', val.toString());
-  };
-
-  const handleToggleAutoBackupCloud = (val: boolean) => {
-    setAutoBackupCloud(val);
-    localStorage.setItem('auto_backup_cloud', val.toString());
-  };
-
-  const handleToggleAutoBackupDownloadFile = (val: boolean) => {
-    setAutoBackupDownloadFile(val);
-    localStorage.setItem('auto_backup_download_file', val.toString());
-  };
-
-  const handleBackupIntervalChange = (val: string) => {
-    setAutoBackupInterval(val);
-    localStorage.setItem('auto_backup_interval', val);
-  };
-
-  const handleToggleAutoBackupOnExit = (val: boolean) => {
-    setAutoBackupOnExit(val);
-    localStorage.setItem('auto_backup_on_exit', val.toString());
-  };
-
-  const handleDeleteBackup = async (id: number) => {
-    if (window.confirm(t('confirm_delete') || 'Are you sure you want to delete this backup?')) {
-      await deleteLocalBackup(id);
-      loadLocalBackupsList();
-    }
-  };
-
-  const handleDownloadBackup = (backup: LocalBackup) => {
-    const blob = new Blob([backup.data as BlobPart], { type: 'application/zip' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = backup.filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleRestoreFromLocal = async (backup: LocalBackup) => {
-    if (!window.confirm(t('confirm_restore_warn') || 'WARNING: This will overwrite all current local data with the backup file. Are you sure?')) {
-      return;
-    }
-
-    try {
-      setLocalBackupStatus('loading');
-
-      const collections = ['products', 'units', 'invoices', 'debts', 'system_config'];
-      for (const colName of collections) {
-        const docs = await db[colName].find().exec();
-        for (const doc of docs) {
-          await doc.remove();
-        }
-      }
-
-      // unzipSync the backup data
-      const unzipped = unzipSync(new Uint8Array(backup.data));
-      const jsonUint8 = unzipped['smartmarket_backup.json'];
-      if (!jsonUint8) {
-        alert(t('invalid_backup_file') || 'Invalid backup file');
-        setLocalBackupStatus('idle');
-        return;
-      }
-      const jsonString = new TextDecoder().decode(jsonUint8);
-      const dump = JSON.parse(jsonString);
-
-      await db.importJSON(dump);
-
-      alert(t('restore_success') || 'Database restored successfully!');
-      window.location.reload();
-    } catch (err) {
-      console.error(err);
-      alert(t('restore_error') || 'Failed to restore database.');
-      setLocalBackupStatus('error');
-      setTimeout(() => setLocalBackupStatus('idle'), 3000);
-    }
-  };
   const [backupStatus, setBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [lastBackup, setLastBackup] = useState<string | null>(null);
-  const [customClientId, setCustomClientId] = useState(() => localStorage.getItem('custom_google_client_id') || '');
   const [localBackupStatus, setLocalBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [customGroqKey, setCustomGroqKey] = useState(() => localStorage.getItem('custom_groq_key') || '');
   const [aiModel, setAiModel] = useState(() => {
@@ -203,14 +95,80 @@ export const Settings = () => {
     localStorage.setItem('auto_backup_enabled', newVal.toString());
   };
 
-  const handleCustomClientIdChange = (val: string) => {
-    setCustomClientId(val);
-    if (val.trim()) {
-      localStorage.setItem('custom_google_client_id', val.trim());
-    } else {
-      localStorage.removeItem('custom_google_client_id');
+  const handleToggleAutoBackupLocal = (val: boolean) => {
+    setAutoBackupLocal(val);
+    localStorage.setItem('auto_backup_local', val.toString());
+  };
+
+  const handleToggleAutoBackupDownloadFile = (val: boolean) => {
+    setAutoBackupDownloadFile(val);
+    localStorage.setItem('auto_backup_download_file', val.toString());
+  };
+
+  const handleBackupIntervalChange = (val: string) => {
+    setAutoBackupInterval(val);
+    localStorage.setItem('auto_backup_interval', val);
+  };
+
+  const handleToggleAutoBackupOnExit = (val: boolean) => {
+    setAutoBackupOnExit(val);
+    localStorage.setItem('auto_backup_on_exit', val.toString());
+  };
+
+  const handleDeleteBackup = async (id: number) => {
+    if (window.confirm(t('confirm_delete') || 'Are you sure you want to delete this backup?')) {
+      await deleteLocalBackup(id);
+      loadLocalBackupsList();
     }
-    window.dispatchEvent(new Event('google_client_id_changed'));
+  };
+
+  const handleDownloadBackup = (backup: LocalBackup) => {
+    const blob = new Blob([backup.data as BlobPart], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = backup.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreFromLocal = async (backup: LocalBackup) => {
+    if (!window.confirm(t('confirm_restore_warn') || 'WARNING: This will overwrite all current local data with the backup file. Are you sure?')) {
+      return;
+    }
+
+    try {
+      setLocalBackupStatus('loading');
+
+      const collections = ['products', 'units', 'invoices', 'debts', 'system_config', 'users', 'branches'];
+      for (const colName of collections) {
+        const docs = await db[colName].find().exec();
+        for (const doc of docs) {
+          await doc.remove();
+        }
+      }
+
+      // unzipSync the backup data
+      const unzipped = unzipSync(new Uint8Array(backup.data));
+      const jsonUint8 = unzipped['smartmarket_backup.json'];
+      if (!jsonUint8) {
+        alert(t('invalid_backup_file') || 'Invalid backup file');
+        setLocalBackupStatus('idle');
+        return;
+      }
+      const jsonString = new TextDecoder().decode(jsonUint8);
+      const dump = JSON.parse(jsonString);
+
+      await db.importJSON(dump);
+
+      alert(t('restore_success') || 'Database restored successfully!');
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert(t('restore_error') || 'Failed to restore database.');
+      setLocalBackupStatus('error');
+      setTimeout(() => setLocalBackupStatus('idle'), 3000);
+    }
   };
 
   const handleLocalExport = async () => {
@@ -261,7 +219,7 @@ export const Settings = () => {
 
         setLocalBackupStatus('loading');
 
-        const collections = ['products', 'units', 'invoices', 'debts', 'system_config'];
+        const collections = ['products', 'units', 'invoices', 'debts', 'system_config', 'users', 'branches'];
         for (const colName of collections) {
           const docs = await db[colName].find().exec();
           for (const doc of docs) {
@@ -285,40 +243,32 @@ export const Settings = () => {
     reader.readAsArrayBuffer(file);
   };
 
-  const executeBackup = async (tokenResponse: GoogleTokenResponse) => {
-    setBackupStatus('loading');
-    try {
-        const driveService = new GoogleDriveService(tokenResponse.access_token);
-        const success = await driveService.backupDatabase(db);
-        
-        if (success) {
-            setBackupStatus('success');
-            setLastBackup(new Date().toLocaleString());
-            setTimeout(() => setBackupStatus('idle'), 3000);
-        } else {
-            setBackupStatus('error');
-        }
-    } catch (err) {
-        console.error(err);
-        setBackupStatus('error');
-    }
+  const loadLocalBackupsList = async () => {
+    const list = await getLocalBackups();
+    setLocalBackups(list);
   };
 
-  const loginForBackup = useGoogleLogin({
-    onSuccess: executeBackup,
-    onError: () => setBackupStatus('error'),
-    scope: 'https://www.googleapis.com/auth/drive.file'
-  });
+  useEffect(() => {
+    loadLocalBackupsList();
+    
+    const handleBackupCompleted = () => {
+      loadLocalBackupsList();
+    };
+    window.addEventListener('auto_backup_completed', handleBackupCompleted);
+    return () => {
+      window.removeEventListener('auto_backup_completed', handleBackupCompleted);
+    };
+  }, []);
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <h2 className="text-2xl font-bold">{t('settings')}</h2>
 
-      {/* Auto-Backup & Cloud Settings Card */}
+      {/* Auto-Backup Settings Card */}
       <div className="bg-white dark:bg-[#1f2028] p-6 rounded-xl shadow-sm border border-black/10 dark:border-white/10">
         <div className="flex items-center gap-3 mb-6 pb-4 border-b border-black/5 dark:border-white/5">
-            <CloudUpload className="text-[var(--color-primary)]" size={28} />
-            <h3 className="text-xl font-semibold">{t('google_drive_backup')}</h3>
+            <HardDrive className="text-[var(--color-primary)]" size={28} />
+            <h3 className="text-xl font-semibold">{t('auto_backup')}</h3>
         </div>
 
         <div className="space-y-6">
@@ -351,16 +301,6 @@ export const Settings = () => {
                                     className="rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)] w-4 h-4"
                                 />
                                 <span>{t('backup_target_local')}</span>
-                            </label>
-
-                            <label className="flex items-center gap-3 cursor-pointer text-sm">
-                                <input 
-                                    type="checkbox"
-                                    checked={autoBackupCloud}
-                                    onChange={(e) => handleToggleAutoBackupCloud(e.target.checked)}
-                                    className="rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)] w-4 h-4"
-                                />
-                                <span>{t('backup_target_cloud')}</span>
                             </label>
 
                             <label className="flex items-center gap-3 cursor-pointer text-sm">
@@ -436,27 +376,6 @@ export const Settings = () => {
                 </div>
             )}
 
-            {/* Google Drive Account Link (Manual Backup button) */}
-            <div className="pt-4 flex items-center justify-between border-t border-black/5 dark:border-white/5">
-                <div>
-                    <h4 className="font-medium">{t('manual_backup')} (Google Drive)</h4>
-                    <p className="text-sm text-gray-500">
-                        {lastBackup ? t('last_backup', { time: lastBackup }) : t('never_backed_up')}
-                    </p>
-                </div>
-                <button 
-                    onClick={() => loginForBackup()}
-                    disabled={backupStatus === 'loading'}
-                    className="flex items-center gap-2 px-6 py-2 bg-[var(--color-primary)] text-white font-medium rounded-lg hover:brightness-110 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
-                >
-                    {backupStatus === 'loading' ? (
-                        <><RefreshCcw size={18} className="animate-spin" /> {t('backing_up')}</>
-                    ) : (
-                        <><CloudUpload size={18} /> {t('backup_now')}</>
-                    )}
-                </button>
-            </div>
-
             {backupStatus === 'success' && (
                 <div className="flex items-center gap-2 text-green-600 bg-green-500/10 p-3 rounded-lg font-medium text-sm">
                     <CheckCircle size={16} /> {t('backup_success')}
@@ -468,19 +387,6 @@ export const Settings = () => {
                     <AlertCircle size={16} /> {t('backup_error')}
                 </div>
             )}
-
-            {/* Custom Google Client ID Input */}
-            <div className="pt-6 border-t border-black/5 dark:border-white/5 space-y-2">
-                <label className="block text-sm font-medium">{t('google_client_id_label')}</label>
-                <p className="text-xs text-gray-500 mb-1">{t('google_client_id_desc')}</p>
-                <input 
-                    type="text"
-                    value={customClientId}
-                    onChange={(e) => handleCustomClientIdChange(e.target.value)}
-                    placeholder={t('google_client_id_placeholder') || 'Enter Google Client ID...'}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono text-xs"
-                />
-            </div>
 
             {/* Local IndexedDB Backups History List */}
             {localBackups.length > 0 && (
@@ -675,8 +581,6 @@ export const Settings = () => {
                 </select>
             </div>
 
-
-
             {/* Add Custom Currency Form */}
             <div className="pt-6 border-t border-black/5 dark:border-white/5">
                 <h4 className="font-medium text-lg mb-4">{t('add_custom_currency')}</h4>
@@ -732,7 +636,6 @@ export const Settings = () => {
         </div>
 
         <form onSubmit={handleSavePrintSettings} className="space-y-6">
-
             {/* Shop Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-black/5 dark:border-white/5">
                 <div>

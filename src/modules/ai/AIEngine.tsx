@@ -68,7 +68,8 @@ export default function AIEngine() {
           body: JSON.stringify({
             prompt,
             model: selectedModel,
-            licenseKey
+            licenseKey,
+            timestamp: new Date().toISOString()
           })
         });
 

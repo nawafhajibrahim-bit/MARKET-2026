@@ -4,6 +4,7 @@ import { FileText, Search, Printer, RotateCcw, X, Calendar, Download } from 'luc
 import { useDb } from '../database/Provider';
 import type { ProductDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
+import { downloadCSV, formatDateForFilename } from '../utils/csvExport';
 import { Receipt } from '../components/Receipt';
 
 interface InvoiceItem {
@@ -310,6 +311,26 @@ export const SalesHistory = () => {
             {t('sales_history')}
           </h2>
         </div>
+        <button
+          onClick={() => {
+            const data = filteredInvoices.map(inv => ({
+              invoice_id: inv.invoice_id,
+              timestamp: inv.timestamp,
+              payment_type: inv.payment_type,
+              total_amount: inv.total_amount,
+              actual_profit: inv.actual_profit ?? 0,
+              discount_amount: inv.discount_amount ?? 0,
+              currency: inv.currency,
+            }));
+            const ok = downloadCSV(data, `sales_${formatDateForFilename()}.csv`);
+            if (ok) triggerNotification(t('export_success') || 'Export successful!', 'success');
+            else triggerNotification(t('export_error') || 'Nothing to export', 'error');
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all font-semibold text-sm cursor-pointer"
+        >
+          <Download size={16} />
+          {t('export_csv') || 'Export CSV'}
+        </button>
       </div>
 
       {/* Filters */}

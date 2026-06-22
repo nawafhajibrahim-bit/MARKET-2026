@@ -35,11 +35,23 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
                 <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-red-200 dark:border-red-900/50 space-y-4">
                     <h2 className="text-xl font-bold text-red-600">Database Error / خطأ في قاعدة البيانات</h2>
                     <p className="text-sm text-gray-500">
-                        فشل تشغيل قاعدة البيانات المحلية. قد يكون هذا بسبب حظر المتصفح لـ IndexedDB أو تعارض في البيانات. يرجى تجربة إعادة تحميل الصفحة أو مسح بيانات المتصفح للموقع.
+                        فشل تشغيل قاعدة البيانات المحلية. <strong>بياناتك لم تُحذف.</strong> السبب الأرجح هو تغيير في هيكلية البيانات بعد تحديث التطبيق. الرجاء اتباع الخطوات التالية:
                     </p>
+                    <ol className="text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
+                        <li>صدر بياناتك من صفحة الإعدادات (Settings) قبل أي شيء.</li>
+                        <li>امسح بيانات الموقع (Clear site data) من إعدادات المتصفح.</li>
+                        <li>أعد استيراد البيانات (Import) من الإعدادات.</li>
+                        <li>أعد تحميل الصفحة.</li>
+                    </ol>
                     <p className="text-sm text-gray-500">
-                        Failed to initialize the local database. This can be caused by IndexedDB being blocked or database schema conflicts. Please try reloading or clearing site data.
+                        Failed to initialize the local database. <strong>Your data is safe.</strong> This is likely caused by a schema change after an app update. Please follow these steps:
                     </p>
+                    <ol className="text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
+                        <li>Export your data from the Settings page first.</li>
+                        <li>Clear site data from your browser settings.</li>
+                        <li>Re-import your data from Settings.</li>
+                        <li>Reload the page.</li>
+                    </ol>
                     <pre className="p-3 bg-red-500/10 rounded text-xs font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
                         {error.message || String(error)}
                     </pre>
