@@ -38,6 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Load session from localStorage on mount
   useEffect(() => {
+    if (!db) return;
+    
     const loadSession = async () => {
       try {
         const savedUserId = localStorage.getItem('sm_current_user_id');
