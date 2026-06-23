@@ -42,6 +42,15 @@ export const initDB = async (): Promise<RxDatabase> => {
             storage: getRxStorageDexie()
         });
 
+        // Request storage persistence to prevent the browser from automatically clearing database.
+        if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+            navigator.storage.persist().then((persisted) => {
+                console.log(persisted ? 'RxDB Storage: Persisted.' : 'RxDB Storage: Cache/Not persisted.');
+            }).catch(err => {
+                console.warn('Storage persistence request failed:', err);
+            });
+        }
+
         const db = await createRxDatabase({
             name: dbName,
             storage,
