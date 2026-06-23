@@ -11,6 +11,8 @@
     "expiry_date": "2027-06-23T10:59:32.373Z",
     "status": "active",
     "max_devices": 1,
-    "activated_devices": []
+    "activated_devices": [
+      "1c1c737c2c37dcbfb79134797e13c8b476c828ec3fbbe55c17505b6722f24799"
+    ]
   }
 }
