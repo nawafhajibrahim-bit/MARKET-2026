@@ -18,10 +18,12 @@ interface AuthContextType {
   loading: boolean;
 }
 
+import { verifyPassword, hashPassword, generateSalt } from '../services/passwordService';
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Simple hash function (SHA-256 via Web Crypto API)
-async function hashPassword(password: string, salt: string): Promise<string> {
+// Simple legacy hash function (SHA-256 via Web Crypto API)
+async function hashLegacyPassword(password: string, salt: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password + salt);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -79,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userCount = await db.users.find().exec().then(docs => docs.length);
         if (userCount === 0) {
           // Create default admin user
-          const adminHash = await hashPassword('admin', 'sm_salt_2025');
+          const adminHash = await hashLegacyPassword('admin', 'sm_salt_2025');
           await db.users.insert({
             user_id: 'user-admin-1',
             username: 'admin',
@@ -131,9 +133,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Account is disabled' };
       }
 
-      const passwordHash = await hashPassword(password, 'sm_salt_2025');
-      if (passwordHash !== user.password_hash) {
+      const verifyResult = await verifyPassword(password, user.password_hash, user.password_salt || '');
+      if (!verifyResult.valid) {
         return { success: false, error: 'Invalid username or password' };
+      }
+
+      // If it's a legacy user, lazily upgrade them to PBKDF2
+      if (verifyResult.needsUpgrade) {
+        const newSalt = generateSalt();
+        const newHash = await hashPassword(password, newSalt);
+        await userDoc.incrementalPatch({
+          password_hash: newHash,
+          password_salt: newSalt
+        });
+        // Also update local user object so the session has the new hash
+        user.password_hash = newHash;
+        user.password_salt = newSalt;
       }
 
       // Set current user

@@ -14,6 +14,7 @@ import { LicenseInterceptor } from './components/LicenseInterceptor';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { DevReset } from './pages/DevReset';
+import { formatLegacyHash } from './services/passwordService';
 import { useAuth } from './contexts/AuthContext';
 
 import { AutoBackupRunner } from './components/AutoBackupRunner';
@@ -24,16 +25,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
-      // Check if this user has ever changed the password from default
-      const hasChanged = localStorage.getItem(`sm_pwd_changed_${currentUser.user_id}`);
-      // We detect default password by absence of the flag — only for admin role
-      if (!hasChanged && currentUser.role === 'admin') {
-        setNeedsPasswordChange(true);
-      } else {
-        setNeedsPasswordChange(false);
+    const checkDefaultPassword = async () => {
+      if (currentUser) {
+        try {
+          const defaultHash = await formatLegacyHash('admin');
+          if (currentUser.role === 'admin' && currentUser.password_hash === defaultHash) {
+            setNeedsPasswordChange(true);
+          } else {
+            setNeedsPasswordChange(false);
+          }
+        } catch (err) {
+          console.error('Failed to check default password:', err);
+        }
       }
-    }
+    };
+    checkDefaultPassword();
   }, [currentUser]);
 
   if (loading) {

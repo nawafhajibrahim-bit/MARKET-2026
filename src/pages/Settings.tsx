@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency } from '../utils/currency';
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
 import { runAutoBackup } from '../components/AutoBackupRunner';
+import { hashPassword as secureHashPassword, generateSalt } from '../services/passwordService';
 import {
   isFolderBackupSupported,
   isFolderBackupEnabled,
@@ -305,13 +306,7 @@ export const Settings = () => {
     setLocalBackups(list);
   };
 
-  async function hashPassword(password: string, salt: string = 'sm_salt_2025'): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + salt);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+
 
   const loadEmployees = async () => {
     if (!db) return;
@@ -342,12 +337,14 @@ export const Settings = () => {
     }
 
     try {
-      const pwdHash = await hashPassword(newPassword);
+      const newSalt = generateSalt();
+      const pwdHash = await secureHashPassword(newPassword, newSalt);
       const userId = 'user-' + Math.random().toString(36).substring(2, 11);
       await db.users.insert({
         user_id: userId,
         username: usernameClean,
         password_hash: pwdHash,
+        password_salt: newSalt,
         display_name: newDisplayName,
         role: newRole,
         branch_id: '',
@@ -390,8 +387,12 @@ export const Settings = () => {
     try {
       const userDoc = await db.users.findOne(userId).exec();
       if (userDoc) {
-        const newHash = await hashPassword(changePasswordVal);
-        await userDoc.incrementalPatch({ password_hash: newHash });
+        const newSalt = generateSalt();
+        const newHash = await secureHashPassword(changePasswordVal, newSalt);
+        await userDoc.incrementalPatch({
+          password_hash: newHash,
+          password_salt: newSalt
+        });
         alert(t('password_changed_success') || 'تم تغيير كلمة المرور بنجاح!');
         setEditingPasswordUserId(null);
         setChangePasswordVal('');

@@ -9,14 +9,7 @@ import { ShieldAlert, Lock, CheckCircle } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import { useAuth } from '../contexts/AuthContext';
 
-// Simple SHA-256 hash (same salt as AuthContext)
-async function hashPassword(password: string, salt: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + salt);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+import { hashPassword, generateSalt } from '../services/passwordService';
 
 interface Props {
     onDone: () => void;
@@ -52,10 +45,14 @@ export const ForcePasswordChange: React.FC<Props> = ({ onDone }) => {
 
         setLoading(true);
         try {
-            const newHash = await hashPassword(newPassword, 'sm_salt_2025');
+            const newSalt = generateSalt();
+            const newHash = await hashPassword(newPassword, newSalt);
             const userDoc = await db.users.findOne(currentUser!.user_id).exec();
             if (!userDoc) throw new Error('User not found');
-            await userDoc.patch({ password_hash: newHash });
+            await userDoc.patch({
+                password_hash: newHash,
+                password_salt: newSalt
+            });
 
             // Mark password as changed — no longer default
             localStorage.setItem(`sm_pwd_changed_${currentUser!.user_id}`, 'true');
