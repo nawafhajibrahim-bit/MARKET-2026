@@ -78,7 +78,12 @@ export const initDB = async (): Promise<RxDatabase> => {
             users: {
                 schema: userSchema,
                 migrationStrategies: {
-                    1: (oldDoc: any) => oldDoc
+                    // v0 → v1: identity (original schema introduction)
+                    1: (oldDoc: any) => oldDoc,
+                    // v1 → v2: add optional `password_salt` field.
+                    // Legacy users keep password_salt undefined (= legacy SHA-256 hash);
+                    // they are transparently upgraded to PBKDF2 on next successful login.
+                    2: (oldDoc: any) => ({ ...oldDoc, password_salt: oldDoc.password_salt ?? '' })
                 }
             },
             branches: {

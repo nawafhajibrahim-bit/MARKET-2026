@@ -129,16 +129,23 @@ export const systemConfigSchema: RxJsonSchema<SystemConfigDocType> = systemConfi
 
 // ───────────────────────────────────────────────
 // User schema (RBAC)
+//
+// Version history:
+//   v1: original schema
+//   v2: added `password_salt` for per-user PBKDF2 password hashing.
+//       Legacy users (salt = '') still authenticate with the old SHA-256 hash
+//       and are transparently upgraded to PBKDF2 on next successful login.
 // ───────────────────────────────────────────────
 export const userSchemaLiteral = {
     title: 'user schema',
-    version: 1,
+    version: 2,
     primaryKey: 'user_id',
     type: 'object',
     properties: {
         user_id: { type: 'string', maxLength: 100 },
         username: { type: 'string', maxLength: 100 },
-        password_hash: { type: 'string', maxLength: 256 }, // bcrypt or PBKDF2 hash
+        password_hash: { type: 'string', maxLength: 256 }, // PBKDF2 hex (or legacy SHA-256 hex)
+        password_salt: { type: 'string', maxLength: 64 }, // per-user random salt (hex). Empty = legacy SHA-256 hash.
         display_name: { type: 'string' },
         role: { type: 'string', maxLength: 50 }, // 'admin' | 'cashier' | 'manager'
         branch_id: { type: 'string', maxLength: 100 }, // nullable for global admins
