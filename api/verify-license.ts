@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { kv } from '@vercel/kv';
+
 type LicenseRecord = {
     merchant_name?: string;
     expiry_date: string;
@@ -31,36 +33,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return res.status(400).json({ error: 'Missing license key' });
     }
 
-    const GITHUB_PAT = process.env.GITHUB_PAT;
-    const REPO_OWNER = process.env.GITHUB_REPO_OWNER;
-    const REPO_NAME = process.env.GITHUB_REPO_NAME;
-    const FILE_PATH = 'licenses.json';
-
-    if (!GITHUB_PAT || !REPO_OWNER || !REPO_NAME) {
-        return res.status(500).json({ error: 'Server configuration missing' });
-    }
-
     try {
-        const githubApiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-        
-        const response = await fetch(githubApiUrl, {
-            headers: {
-                'Authorization': `token ${GITHUB_PAT}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        });
-
-        if (!response.ok) {
-            return res.status(500).json({ error: 'Failed to fetch licenses from GitHub' });
-        }
-
-        const data = (await response.json()) as any;
-        const fileSha = data.sha;
-        // GitHub API returns content as base64
-        const content = Buffer.from(data.content, 'base64').toString('utf-8');
-        const licenses = JSON.parse(content) as Record<string, LicenseRecord>;
-
-        const licenseInfo = licenses[license_key];
+        const licenseInfo: LicenseRecord | null = await kv.get(`license:${license_key}`);
         
         if (!licenseInfo) {
             return res.status(404).json({ active: false, error: 'license_not_found' });
@@ -99,30 +73,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
                 // Register the new device fingerprint
                 const updatedDevices = [...devices, hw_fingerprint];
-                licenses[license_key] = {
+                const updatedRecord = {
                     ...licenseInfo,
                     activated_devices: updatedDevices
                 };
 
-                // Write back updated license info to GitHub
-                const newContent = Buffer.from(JSON.stringify(licenses, null, 2)).toString('base64');
-                const putRes = await fetch(githubApiUrl, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `token ${GITHUB_PAT}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: `Register device for key ${license_key}`,
-                        content: newContent,
-                        sha: fileSha
-                    })
-                });
-
-                if (!putRes.ok) {
-                    return res.status(500).json({ error: 'Failed to update license devices on server' });
-                }
+                await kv.set(`license:${license_key}`, updatedRecord);
             }
         }
 
