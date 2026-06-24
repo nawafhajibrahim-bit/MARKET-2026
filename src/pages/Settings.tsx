@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +48,10 @@ export const Settings = () => {
   const [backupStatus, setBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [localBackupStatus, setLocalBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [customGroqKey, setCustomGroqKey] = useState(() => localStorage.getItem('custom_groq_key') || '');
+  const [showSettingsAiWarning, setShowSettingsAiWarning] = useState(() => {
+    return !localStorage.getItem('custom_groq_key') && localStorage.getItem('dismiss_settings_ai_warning') !== 'true';
+  });
+  const [showInstructions, setShowInstructions] = useState(true);
   const [aiModel, setAiModel] = useState(() => {
     let saved = localStorage.getItem('ai_model') || 'llama-3.1-8b-instant';
     if (saved === 'llama3-8b-8192') {
@@ -110,6 +114,11 @@ export const Settings = () => {
   const handleCustomKeyChange = (val: string) => {
     setCustomGroqKey(val);
     localStorage.setItem('custom_groq_key', val);
+    if (val) {
+      setShowSettingsAiWarning(false);
+    } else {
+      setShowSettingsAiWarning(localStorage.getItem('dismiss_settings_ai_warning') !== 'true');
+    }
   };
 
   const handleModelChange = (val: string) => {
@@ -792,11 +801,57 @@ export const Settings = () => {
         </div>
 
         {aiEnabled && (
-          <div className="mt-6 pt-6 border-t border-black/5 dark:border-white/5 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="mt-6 pt-6 border-t border-black/5 dark:border-white/5 space-y-5 animate-in fade-in slide-in-from-top-4 duration-300">
+            {/* Shared Server Warning Alert (dismissible) */}
+            {showSettingsAiWarning && (
+              <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start justify-between gap-3 text-orange-800 dark:text-orange-300 text-sm animate-in fade-in slide-in-from-top duration-200">
+                <div className="flex-1 flex items-start gap-2.5">
+                  <AlertCircle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">{t('settings_ai_warning')}</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowSettingsAiWarning(false);
+                    localStorage.setItem('dismiss_settings_ai_warning', 'true');
+                  }}
+                  className="p-1 hover:bg-orange-500/20 rounded-lg transition-colors cursor-pointer text-orange-500 flex-shrink-0"
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Collapsible Instruction Guide to Get API Key */}
+            <div className="border border-black/5 dark:border-white/5 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] overflow-hidden">
+              <button 
+                type="button"
+                onClick={() => setShowInstructions(!showInstructions)}
+                className="w-full flex items-center justify-between p-4 font-medium text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <BookOpen size={16} className="text-[var(--color-primary)]" />
+                  {t('instructions_title')}
+                </span>
+                <span className="text-xs text-gray-500">{showInstructions ? '▲ إخفاء' : '▼ عرض التفاصيل'}</span>
+              </button>
+              
+              {showInstructions && (
+                <div className="p-4 pt-0 border-t border-black/5 dark:border-white/5 space-y-2 text-xs text-gray-600 dark:text-gray-400 bg-white/40 dark:bg-black/10 transition-all animate-in fade-in duration-200">
+                  <p>{t('instruction_step_1')}</p>
+                  <p>{t('instruction_step_2')}</p>
+                  <p>{t('instruction_step_3')}</p>
+                  <p>{t('instruction_step_4')}</p>
+                  <p>{t('instruction_step_5')}</p>
+                </div>
+              )}
+            </div>
+
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-sm font-medium">{t('custom_groq_key')}</label>
-                <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--color-primary)] hover:underline">
+                <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1">
+                  <Info size={12} />
                   {t('get_groq_key') || 'Get API Key'}
                 </a>
               </div>
@@ -805,7 +860,7 @@ export const Settings = () => {
                 value={customGroqKey}
                 onChange={(e) => handleCustomKeyChange(e.target.value)}
                 placeholder={t('custom_groq_key_placeholder')}
-                className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
+                className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono"
               />
             </div>
             <div>

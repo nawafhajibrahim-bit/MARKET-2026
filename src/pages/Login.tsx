@@ -6,8 +6,8 @@ import { useAuth } from '../contexts/AuthContext';
 export const LoginScreen: React.FC = () => {
   const { t } = useTranslation();
   const { login, availableBranches, switchBranch } = useAuth();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('admin');
   const [selectedBranch, setSelectedBranch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -96,6 +96,10 @@ export const LoginScreen: React.FC = () => {
               </div>
             </div>
           )}
+
+          <div className="text-center p-3 bg-black/5 dark:bg-white/5 text-gray-500 dark:text-gray-400 rounded-lg text-xs leading-relaxed border border-black/5 dark:border-white/5">
+            💡 {t('default_credentials_hint') || 'للدخول الافتراضي السريع: اسم المستخدم admin وكلمة المرور admin'}
+          </div>
 
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 text-red-500 text-sm text-center">

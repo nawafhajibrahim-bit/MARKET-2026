@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Sparkles, Send, BrainCircuit, AlertCircle } from 'lucide-react';
+import { Sparkles, Send, BrainCircuit, AlertCircle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useDb } from '../../database/Provider';
 
 export default function AIEngine() {
@@ -9,6 +10,18 @@ export default function AIEngine() {
   const [query, setQuery] = useState('');
   const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAiWarning, setShowAiWarning] = useState(false);
+
+  useEffect(() => {
+    const hasKey = !!localStorage.getItem('custom_groq_key');
+    const isDismissed = localStorage.getItem('dismiss_ai_warning') === 'true';
+    setShowAiWarning(!hasKey && !isDismissed);
+  }, []);
+
+  const handleDismissAiWarning = () => {
+    setShowAiWarning(false);
+    localStorage.setItem('dismiss_ai_warning', 'true');
+  };
 
   const fetchGroq = useCallback(async (prompt: string) => {
     const customKey = localStorage.getItem('custom_groq_key') || '';
@@ -187,6 +200,30 @@ ${dbContext}
           {t('ai_engine_title')}
         </h3>
       </div>
+
+      {showAiWarning && (
+        <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-start justify-between gap-3 text-orange-800 dark:text-orange-300 text-sm animate-in fade-in slide-in-from-top duration-200">
+          <div className="flex-grow flex items-start gap-3">
+            <AlertCircle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1.5">
+              <p className="leading-relaxed">{t('ai_shared_key_warning')}</p>
+              <Link 
+                to="/settings" 
+                className="inline-flex items-center gap-1 font-bold text-xs text-[var(--color-primary)] hover:underline"
+              >
+                {t('i18n_language')?.startsWith?.('ar') || true ? 'الانتقال إلى الإعدادات لمشاهدة طريقة إضافة مفتاحك الخاص 👈' : 'Go to Settings to see how to add your own key 👈'}
+              </Link>
+            </div>
+          </div>
+          <button 
+            onClick={handleDismissAiWarning}
+            className="p-1 hover:bg-orange-500/20 rounded-lg transition-colors cursor-pointer text-orange-500 flex-shrink-0"
+            aria-label="إغلاق"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Natural Language Query Engine */}

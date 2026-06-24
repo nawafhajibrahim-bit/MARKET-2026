@@ -17,6 +17,17 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(true);
 
+  useEffect(() => {
+    if (warningMessage) {
+      const dismissed = sessionStorage.getItem('dismissed_license_warning');
+      if (dismissed === warningMessage) {
+        setShowWarning(false);
+      } else {
+        setShowWarning(true);
+      }
+    }
+  }, [warningMessage]);
+
   const [inputKey, setInputKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -475,7 +486,12 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     <span>{warningMessage}</span>
                 </div>
                 <button 
-                  onClick={() => setShowWarning(false)}
+                  onClick={() => {
+                    setShowWarning(false);
+                    if (warningMessage) {
+                      sessionStorage.setItem('dismissed_license_warning', warningMessage);
+                    }
+                  }}
                   className="p-1 hover:bg-orange-600 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
                   aria-label="Close warning"
                 >
