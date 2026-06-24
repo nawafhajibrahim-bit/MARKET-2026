@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { POS } from './pages/POS';
@@ -96,16 +96,13 @@ function App() {
           {/* Standalone Admin route for the program owner - only requires ADMIN_SECRET */}
           <Route path="/admin" element={<Admin />} />
 
-          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-            {/* All main routes wrapped by license interceptor */}
-            <Route element={<LicenseInterceptor><Outlet /></LicenseInterceptor>}>
-              <Route index element={<Dashboard />} />
-              <Route path="pos" element={<POS />} />
-              <Route path="inventory" element={<AdminGuard><Inventory /></AdminGuard>} />
-              <Route path="settings" element={<AdminGuard><Settings /></AdminGuard>} />
-              <Route path="debts" element={<Debts />} />
-              <Route path="sales-history" element={<SalesHistory />} />
-            </Route>
+          <Route path="/" element={<LicenseInterceptor><AuthGuard><Layout /></AuthGuard></LicenseInterceptor>}>
+            <Route index element={<Dashboard />} />
+            <Route path="pos" element={<POS />} />
+            <Route path="inventory" element={<AdminGuard><Inventory /></AdminGuard>} />
+            <Route path="settings" element={<AdminGuard><Settings /></AdminGuard>} />
+            <Route path="debts" element={<Debts />} />
+            <Route path="sales-history" element={<SalesHistory />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
