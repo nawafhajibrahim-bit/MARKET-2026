@@ -176,7 +176,11 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     if (isMounted) {
                       if (isTrial) {
                         const daysLeft = Math.max(0, Math.ceil((new Date(data.expiry_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                        setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+                        if (daysLeft <= 5) {
+                          setWarningMessage(`تنبيه هام: متبقي لديك ${daysLeft} أيام فقط في الفترة التجريبية. يرجى أخذ نسخة احتياطية من بياناتك ومنتجاتك الآن (من صفحة الإعدادات) لتجنب فقدانها عند انتهاء التجربة وقفل البرنامج. للتفعيل الكامل اتصل بنا: ${OWNER_PHONE}`);
+                        } else {
+                          setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+                        }
                       } else {
                         setWarningMessage(null);
                       }
@@ -201,7 +205,11 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
         if (isTrial && expiryDateStr) {
           const daysLeft = Math.max(0, Math.ceil((new Date(expiryDateStr).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
           if (isMounted) {
-            setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية (أوفلاين)، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+            if (daysLeft <= 5) {
+              setWarningMessage(`تنبيه هام: متبقي لديك ${daysLeft} أيام فقط في الفترة التجريبية (أوفلاين). يرجى أخذ نسخة احتياطية من بياناتك ومنتجاتك الآن (من صفحة الإعدادات) لتجنب فقدانها عند انتهاء التجربة وقفل البرنامج. للتفعيل الكامل اتصل بنا: ${OWNER_PHONE}`);
+            } else {
+              setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية (أوفلاين)، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+            }
             setIsAuthorized(true);
           }
           return;
