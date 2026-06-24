@@ -44,6 +44,7 @@ export const Layout = () => {
     { path: '/sales-history', label: t('sales_history'), icon: FileText, roles: ['admin', 'manager', 'cashier'] },
     { path: '/debts', label: t('debts_nav'), icon: HandCoins, roles: ['admin', 'manager', 'cashier'] },
     { path: '/settings', label: t('settings'), icon: SettingsIcon, roles: ['admin', 'manager'] },
+    { path: '/admin', label: t('subscriber_mgmt'), icon: ShieldCheck, roles: ['admin'] },
   ];
 
   const userRole = currentUser?.role || 'cashier';

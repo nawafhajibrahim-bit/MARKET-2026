@@ -89,6 +89,7 @@
   "license_verify_failed": "Failed to verify license. Check network.",
   "license_error": "Error verifying license.",
   "admin_title": "Admin Control Center",
+  "subscriber_mgmt": "Subscriber Mgmt",
   "generate_license_title": "Generate New Merchant License",
   "admin_secret": "Admin Secret",
   "admin_secret_placeholder": "Enter master admin secret",

@@ -89,6 +89,7 @@
   "license_verify_failed": "فشل التحقق من الترخيص. تحقق من الشبكة.",
   "license_error": "حدث خطأ أثناء التحقق من الترخيص.",
   "admin_title": "مركز التحكم للمشرف",
+  "subscriber_mgmt": "إدارة المشتركين",
   "generate_license_title": "توليد رخصة تاجر جديدة",
   "admin_secret": "الرمز السري للمشرف",
   "admin_secret_placeholder": "أدخل الرمز السري الرئيسي للمشرف",
