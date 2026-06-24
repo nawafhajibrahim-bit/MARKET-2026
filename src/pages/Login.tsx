@@ -12,6 +12,13 @@ export const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Automatically select the first branch by default
+  React.useEffect(() => {
+    if (availableBranches.length > 0 && !selectedBranch) {
+      setSelectedBranch(availableBranches[0].branch_id);
+    }
+  }, [availableBranches, selectedBranch]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
