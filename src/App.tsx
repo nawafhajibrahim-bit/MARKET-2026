@@ -93,10 +93,10 @@ function App() {
           {/* Hidden developer recovery route — no auth, no license check */}
           <Route path="/dev-reset" element={<DevReset />} />
 
-          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-            {/* Admin route - protected by manager/admin role */}
-            <Route path="admin" element={<AdminGuard><Admin /></AdminGuard>} />
+          {/* Standalone Admin route for the program owner - only requires ADMIN_SECRET */}
+          <Route path="/admin" element={<Admin />} />
 
+          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
             {/* All main routes wrapped by license interceptor */}
             <Route element={<LicenseInterceptor><Outlet /></LicenseInterceptor>}>
               <Route index element={<Dashboard />} />

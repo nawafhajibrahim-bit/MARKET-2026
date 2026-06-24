@@ -16,6 +16,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 export const Admin = () => {
   const { i18n } = useTranslation();
@@ -329,6 +330,11 @@ export const Admin = () => {
               {isAr ? '🔑 دخول سحابي آمن' : '🔑 Secure Cloud Login'}
             </button>
           </form>
+          <div className="pt-4 border-t border-black/5 dark:border-white/5 mt-4">
+            <Link to="/" className="text-xs text-[var(--color-primary)] font-bold hover:underline inline-flex items-center gap-1">
+              {isAr ? 'العودة للبرنامج الرئيسي ↩️' : 'Go back to POS App ↩️'}
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -373,8 +379,15 @@ export const Admin = () => {
             onClick={handleLogout}
             className="px-4 py-2.5 text-xs font-bold bg-red-500/10 text-red-500 hover:bg-red-500/15 rounded-xl active:scale-95 transition-all cursor-pointer border border-red-500/10"
           >
-            {isAr ? 'خروج' : 'Logout'}
+            {isAr ? 'تسجيل الخروج' : 'Logout'}
           </button>
+
+          <Link
+            to="/"
+            className="px-4 py-2.5 text-xs font-bold bg-purple-500/10 text-[var(--color-primary)] hover:bg-purple-500/15 rounded-xl active:scale-95 transition-all cursor-pointer border border-purple-500/10 flex items-center justify-center gap-1"
+          >
+            {isAr ? 'العودة للبرنامج ↩️' : 'Back to POS ↩️'}
+          </Link>
         </div>
       </div>
 
