@@ -26,7 +26,7 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAi = () => setAiEnabled(localStorage.getItem('ai_enabled') === 'true');
+    const checkAi = () => setAiEnabled(localStorage.getItem('ai_enabled') !== 'false');
     checkAi();
     window.addEventListener('storage', checkAi);
     return () => window.removeEventListener('storage', checkAi);

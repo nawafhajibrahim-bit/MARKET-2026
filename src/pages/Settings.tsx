@@ -63,7 +63,7 @@ export const Settings = () => {
     }
     return saved;
   });
-  const [aiEnabled, setAiEnabled] = useState(() => localStorage.getItem('ai_enabled') === 'true');
+  const [aiEnabled, setAiEnabled] = useState(() => localStorage.getItem('ai_enabled') !== 'false');
 
   const [currencies, setCurrencies] = useState(getCurrenciesList);
   const [officialCurrency, setOfficialCurrencyState] = useState(getOfficialCurrency().code);

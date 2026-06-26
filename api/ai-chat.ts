@@ -34,7 +34,12 @@ export default async function handler(req: any, res: any) {
         return res.status(401).json({ error: 'License key is required to use AI features.' });
     }
 
-    const isDemoKey = licenseKey === 'TEST-LICENSE' || licenseKey === 'TEST';
+    const isDemoKey = licenseKey === 'TEST-LICENSE' || 
+                       licenseKey === 'TEST' || 
+                       licenseKey === 'TRIAL' ||
+                       licenseKey === '1234' || 
+                       licenseKey === '123456' || 
+                       licenseKey === '123';
     const isDemoAllowed = process.env.VITE_ENABLE_DEMO_LOGIN === 'true' || process.env.NODE_ENV === 'development';
 
     if (isDemoKey && isDemoAllowed) {
