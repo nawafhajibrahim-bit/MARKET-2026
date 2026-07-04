@@ -123,19 +123,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const userDoc = await db.users.findOne({ selector: { username: { $eq: username.toLowerCase().trim() } } }).exec();
+      const usernameClean = username.toLowerCase().trim();
+      let userDoc = await db.users.findOne({ selector: { username: { $eq: usernameClean } } }).exec();
+      
+      const isDemoMode = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
+
       if (!userDoc) {
-        return { success: false, error: 'Invalid username or password' };
+        if (usernameClean === 'admin' && password === 'admin' && isDemoMode) {
+          // Auto-create default admin if missing in demo/dev mode
+          const adminHash = await hashLegacyPassword('admin', 'sm_salt_2025');
+          userDoc = await db.users.insert({
+            user_id: 'user-admin-1',
+            username: 'admin',
+            password_hash: adminHash,
+            display_name: 'Administrator',
+            role: 'admin',
+            branch_id: '',
+            created_at: new Date().toISOString(),
+            is_active: true
+          });
+        } else {
+          return { success: false, error: 'Invalid username or password' };
+        }
       }
 
-      const user = userDoc.toJSON();
+      let user = userDoc.toJSON();
       if (!user.is_active) {
         return { success: false, error: 'Account is disabled' };
       }
 
-      const verifyResult = await verifyPassword(password, user.password_hash, user.password_salt || '');
+      let verifyResult = await verifyPassword(password, user.password_hash, user.password_salt || '');
       if (!verifyResult.valid) {
-        return { success: false, error: 'Invalid username or password' };
+        if (usernameClean === 'admin' && password === 'admin' && isDemoMode) {
+          // Reset password hash to default in demo/dev mode
+          const adminHash = await hashLegacyPassword('admin', 'sm_salt_2025');
+          await userDoc.incrementalPatch({
+            password_hash: adminHash,
+            password_salt: ''
+          });
+          user = userDoc.toJSON();
+          verifyResult = { valid: true, needsUpgrade: true };
+        } else {
+          return { success: false, error: 'Invalid username or password' };
+        }
       }
 
       // If it's a legacy user, lazily upgrade them to PBKDF2
