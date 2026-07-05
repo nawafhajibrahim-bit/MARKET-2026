@@ -116,6 +116,41 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         }
     };
 
+    const handleClearAndReset = () => {
+        const confirmReset = window.confirm(
+            '⚠️ تحذير: سيتم مسح قاعدة البيانات المحلية وإعادة تشغيل التطبيق.\n' +
+            'الرجاء التأكد من تصدير نسخة احتياطية أولاً باستخدام الزر البرتقالي.\n\n' +
+            'هل أنت متأكد من المسح وإعادة التشغيل؟'
+        );
+        if (!confirmReset) return;
+
+        try {
+            const dbName = 'smartmarketdb_v4';
+            const req = indexedDB.deleteDatabase(dbName);
+            
+            req.onsuccess = () => {
+                localStorage.clear();
+                alert('تم مسح البيانات بنجاح. سيتم إعادة تشغيل التطبيق الآن.');
+                window.location.reload();
+            };
+            
+            req.onerror = () => {
+                localStorage.clear();
+                alert('فشل المسح التلقائي بالكامل، سيتم إعادة تشغيل التطبيق. يرجى مسح بيانات المتصفح يدوياً إذا لم تنجح العملية.');
+                window.location.reload();
+            };
+            
+            req.onblocked = () => {
+                localStorage.clear();
+                alert('العملية معلقة بسبب نوافذ أخرى مفتوحة. يرجى إغلاق جميع نوافذ البرنامج الأخرى ثم إعادة المحاولة، أو مسح بيانات المتصفح يدوياً.');
+                window.location.reload();
+            };
+        } catch (err) {
+            localStorage.clear();
+            window.location.reload();
+        }
+    };
+
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-red-50 dark:bg-red-950/20 text-red-900 dark:text-red-200" dir="auto">
@@ -126,16 +161,16 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
                     </p>
                     <ol className="text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
                         <li>صدر بياناتك باستخدام زر "تصدير نسخة طارئة" بالأسفل لحفظ عملك.</li>
-                        <li>امسح بيانات الموقع (Clear site data) من إعدادات المتصفح.</li>
-                        <li>أعد تحميل الصفحة واستورد ملف النسخة الاحتياطية.</li>
+                        <li>اضغط على زر "مسح وإعادة تشغيل التطبيق" للتنظيف التلقائي.</li>
+                        <li>أعد استيراد النسخة الاحتياطية بعد فتح البرنامج.</li>
                     </ol>
                     <p className="text-sm text-gray-500">
                         Failed to initialize the local database. <strong>Your data is safe.</strong> This is likely caused by a schema change after an app update. Please follow these steps:
                     </p>
                     <ol className="text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside space-y-1">
                         <li>Click "Export Emergency Backup" below to save your data first.</li>
-                        <li>Clear site data from your browser settings.</li>
-                        <li>Reload the page and import your backup file.</li>
+                        <li>Click "Clear & Reset App" to clean and reset automatically.</li>
+                        <li>Import your backup file once the app opens.</li>
                     </ol>
                     <pre className="p-3 bg-red-500/10 rounded text-xs font-mono overflow-auto max-h-40 whitespace-pre-wrap break-all">
                         {error.message || String(error)}
@@ -148,8 +183,14 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
                             📥 Export Emergency Backup / تصدير نسخة احتياطية طارئة
                         </button>
                         <button 
+                            onClick={handleClearAndReset} 
+                            className="w-full py-2 bg-red-500/10 text-red-600 border border-red-500/20 rounded-lg font-semibold hover:bg-red-600 hover:text-white active:scale-95 transition-all text-sm cursor-pointer"
+                        >
+                            🗑️ Clear & Reset App / مسح وإعادة تشغيل التطبيق
+                        </button>
+                        <button 
                             onClick={() => window.location.reload()} 
-                            className="w-full py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors text-sm cursor-pointer"
+                            className="w-full py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors text-sm cursor-pointer"
                         >
                             Retry / إعادة المحاولة
                         </button>
