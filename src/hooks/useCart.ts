@@ -81,6 +81,30 @@ export function useCart(
     }
   };
 
+  const handleSetQuantity = (index: number, newQty: number) => {
+    if (isNaN(newQty) || newQty <= 0) return;
+    const updated = [...cart];
+    const item = updated[index];
+    
+    const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;
+    const currentOtherBaseQty = getProductQtyInCart(item.product.id, index);
+    const newTotalBaseQty = currentOtherBaseQty + (newQty * factor);
+
+    if (newTotalBaseQty > item.product.stock_quantity) {
+      triggerNotification(t('quantity_exceeds_stock'), 'error');
+      // Optionally cap it to max available
+      const maxAllowed = (item.product.stock_quantity - currentOtherBaseQty) / factor;
+      if (maxAllowed > 0) {
+        item.quantity = maxAllowed;
+        setCart(updated);
+      }
+      return;
+    }
+    
+    item.quantity = newQty;
+    setCart(updated);
+  };
+
   const handleUnitChangeInCart = (index: number, unitId: string) => {
     const updated = [...cart];
     const item = updated[index];
@@ -124,6 +148,7 @@ export function useCart(
     handleAddToCart,
     handleRemoveFromCart,
     handleQuantityChange,
+    handleSetQuantity,
     handleUnitChangeInCart,
     calculateCartTotal,
     clearCart

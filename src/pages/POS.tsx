@@ -62,6 +62,7 @@ export const POS = () => {
     handleAddToCart,
     handleRemoveFromCart,
     handleQuantityChange,
+    handleSetQuantity,
     handleUnitChangeInCart,
     calculateCartTotal,
     clearCart
@@ -674,7 +675,21 @@ export const POS = () => {
                       >
                         <Minus size={14} />
                       </button>
-                      <span className="font-mono px-3 text-sm font-semibold">{item.quantity}</span>
+                      <input 
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.quantity}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val > 0) {
+                            handleSetQuantity(index, val);
+                          }
+                        }}
+                        className="w-14 font-mono px-1 text-center text-sm font-semibold bg-transparent outline-none"
+                        style={{ MozAppearance: 'textfield' }}
+                      />
                       <button 
                         onClick={() => handleQuantityChange(index, 1)}
                         className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors cursor-pointer"
