@@ -1,0 +1,14 @@
+{
+  "version": "1.4.1",
+  "release_date": "2026-07-05",
+  "changelog_ar": [
+    "إضافة دعم وحدات القياس المتعددة (الكيلوغرام، اللتر، إلخ) عند إدخال وبيع المواد.",
+    "إتاحة زر البحث اليدوي عن التحديثات وتصفح سجل التغييرات الجديد.",
+    "تحسينات عامة على واجهة نقطة البيع لتعمل بسلاسة أكبر."
+  ],
+  "changelog_en": [
+    "Added support for multi-units (Kilogram, Liter, etc.) in POS and Inventory.",
+    "Introduced manual check for updates button and release notes viewer.",
+    "General UI improvements in POS screen."
+  ]
+}

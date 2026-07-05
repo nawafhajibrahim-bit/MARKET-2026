@@ -3,7 +3,7 @@ import type { ExtractDocumentTypeFromTypedRxJsonSchema, RxJsonSchema } from 'rxd
 
 export const productSchemaLiteral = {
     title: 'product schema',
-    version: 0,
+    version: 1,
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -18,8 +18,9 @@ export const productSchemaLiteral = {
         stock_quantity: { type: 'number' },
         min_safety_stock: { type: 'number' },
         expiry_date: { type: 'string' },
+        unit: { type: 'string' },
     },
-    required: ['id', 'barcode', 'category', 'name_ar', 'cost_price', 'sale_price', 'stock_quantity'],
+    required: ['id', 'barcode', 'category', 'name_ar', 'cost_price', 'sale_price', 'stock_quantity', 'unit'],
     indexes: ['barcode', 'category'],
 } as const;
 export const schemaTypedProduct = toTypedRxJsonSchema(productSchemaLiteral);

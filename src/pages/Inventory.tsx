@@ -33,6 +33,7 @@ export const Inventory = () => {
   const [stockQuantity, setStockQuantity] = useState(0);
   const [minSafetyStock, setMinSafetyStock] = useState(5);
   const [expiryDate, setExpiryDate] = useState('');
+  const [unit, setUnit] = useState<string>('piece');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -65,6 +66,7 @@ export const Inventory = () => {
         setStockQuantity(0);
         setMinSafetyStock(p.min_safety_stock ?? 5);
         setExpiryDate(p.expiry_date || '');
+        setUnit(p.unit || 'piece');
         
         const units = await db.units.find({ selector: { product_id: p.id } }).exec();
         setAdditionalUnits(units.map(u => {
@@ -91,6 +93,7 @@ export const Inventory = () => {
     setStockQuantity(0);
     setMinSafetyStock(product.min_safety_stock ?? 5);
     setExpiryDate(product.expiry_date || '');
+    setUnit(product.unit || 'piece');
     
     const units = await db.units.find({ selector: { product_id: product.id } }).exec();
     setAdditionalUnits(units.map(u => {
@@ -116,6 +119,7 @@ export const Inventory = () => {
     setStockQuantity(0);
     setMinSafetyStock(5);
     setExpiryDate('');
+    setUnit('piece');
     setAdditionalUnits([]);
     setShowModal(true);
   };
@@ -231,7 +235,8 @@ export const Inventory = () => {
             sale_price: Number(salePrice),
             stock_quantity: currentStock + addedQty,
             min_safety_stock: Number(minSafetyStock),
-            expiry_date: expiryDate || undefined
+            expiry_date: expiryDate || undefined,
+            unit: unit
           });
 
           // Re-save additional units
@@ -267,7 +272,8 @@ export const Inventory = () => {
           sale_price: Number(salePrice),
           stock_quantity: Number(stockQuantity),
           min_safety_stock: Number(minSafetyStock),
-          expiry_date: expiryDate || undefined
+          expiry_date: expiryDate || undefined,
+          unit: unit
         });
 
         for (const unit of additionalUnits) {
@@ -295,6 +301,7 @@ export const Inventory = () => {
       setStockQuantity(0);
       setMinSafetyStock(5);
       setExpiryDate('');
+      setUnit('piece');
       setAdditionalUnits([]);
       setEditProductId(null);
       setShowModal(false);
@@ -478,8 +485,8 @@ export const Inventory = () => {
                       {formatCurrency(p.sale_price)}
                     </td>
                     <td className="p-4 text-center">
-                      <span className="inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 font-mono text-sm">
-                        {p.stock_quantity}
+                      <span className="inline-flex items-center justify-center min-w-[3rem] px-2.5 py-1 rounded bg-gray-100 dark:bg-gray-800 font-mono text-sm gap-1">
+                        {p.stock_quantity} <span className="text-[10px] text-gray-500 font-sans">{t(`unit_${p.unit || 'piece'}`, { defaultValue: p.unit || 'piece' })}</span>
                       </span>
                     </td>
                     <td className="p-4 text-center">
@@ -599,16 +606,34 @@ export const Inventory = () => {
                     placeholder={i18n.language === 'ar' ? 'ماء معدني 500 مل' : 'Mineral Water 500ml'}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">{t('category')}</label>
-                  <input 
-                    type="text" 
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                    placeholder="Drinks"
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium mb-1">{t('category')}</label>
+                   <input 
+                     type="text" 
+                     value={category}
+                     onChange={(e) => setCategory(e.target.value)}
+                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
+                     placeholder="Drinks"
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium mb-1">{t('base_unit_label')}</label>
+                   <select 
+                     value={unit}
+                     onChange={(e) => setUnit(e.target.value)}
+                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer"
+                   >
+                     <option value="piece">{t('unit_piece')}</option>
+                     <option value="kg">{t('unit_kg')}</option>
+                     <option value="gram">{t('unit_gram')}</option>
+                     <option value="liter">{t('unit_liter')}</option>
+                     <option value="ml">{t('unit_ml')}</option>
+                     <option value="box">{t('unit_box')}</option>
+                     <option value="carton">{t('unit_carton')}</option>
+                     <option value="bag">{t('unit_bag')}</option>
+                     <option value="meter">{t('unit_meter')}</option>
+                   </select>
+                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">{t('cost_price_label')}</label>
                   <input 
@@ -697,7 +722,9 @@ export const Inventory = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1">{t('conversion_factor_label')}</label>
+                      <label className="block text-xs font-medium mb-1">
+                        {t('conversion_factor_label_dynamic', { unit: t(`unit_${unit}`, { defaultValue: unit }) })}
+                      </label>
                       <input 
                         type="number" 
                         required

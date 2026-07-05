@@ -154,7 +154,7 @@ export const SalesHistory = () => {
           costPrice = pData.cost_price;
           // For base unit, factor is 1. For other units, we'd need to look it up.
           let factor = 1;
-          if (item.unit_used !== 'piece') {
+          if (item.unit_used !== (pData.unit || 'piece')) {
             const unitDocs = await db.units.find({
               selector: { product_id: item.product_id }
             }).exec();
@@ -245,8 +245,9 @@ export const SalesHistory = () => {
           stock_quantity: 0,
           min_safety_stock: 0,
           expiry_date: '',
+          unit: 'piece',
         },
-        selectedUnit: item.unit_used !== 'piece' ? {
+        selectedUnit: item.unit_used !== (product?.unit || 'piece') ? {
           unit_id: '',
           product_id: item.product_id,
           unit_name: item.unit_used,

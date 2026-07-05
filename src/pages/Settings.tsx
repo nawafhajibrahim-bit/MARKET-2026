@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
 import { useAuth } from '../contexts/AuthContext';
-import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency } from '../utils/currency';
+import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency, getPOSExchangeRate, setPOSExchangeRate, getPOSHelperCurrency, setPOSHelperCurrency } from '../utils/currency';
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
 import { runAutoBackup } from '../components/AutoBackupRunner';
 import { hashPassword as secureHashPassword, generateSalt } from '../services/passwordService';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import { APP_VERSION } from '../utils/version';
 import {
   isFolderBackupSupported,
   isFolderBackupEnabled,
@@ -20,10 +22,24 @@ import {
 } from '../services/folderBackupService';
 
 export const Settings = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const db = useDb();
   
   const { currentUser, isAdmin } = useAuth();
+
+  // PWA update states
+  const { updateServiceWorker } = useRegisterSW();
+
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{
+    version: string;
+    release_date: string;
+    changelog_ar: string[];
+    changelog_en: string[];
+  } | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
   const [newUsername, setNewUsername] = useState('');
   const [newDisplayName, setNewDisplayName] = useState('');
@@ -67,6 +83,8 @@ export const Settings = () => {
 
   const [currencies, setCurrencies] = useState(getCurrenciesList);
   const [officialCurrency, setOfficialCurrencyState] = useState(getOfficialCurrency().code);
+  const [helperCurrency, setHelperCurrencyState] = useState(() => getPOSHelperCurrency());
+  const [exchangeRate, setExchangeRateState] = useState(() => getPOSExchangeRate());
   const [customCode, setCustomCode] = useState('');
   const [customSymbol, setCustomSymbol] = useState('');
   const [currencyError, setCurrencyError] = useState<string | null>(null);
@@ -89,9 +107,70 @@ export const Settings = () => {
     setTimeout(() => setPrintSuccess(null), 3000);
   };
 
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdates(true);
+    setUpdateError(null);
+    setUpdateStatusMsg(null);
+    try {
+      const response = await fetch(`/version.json?t=${Date.now()}`);
+      if (!response.ok) throw new Error('Network error');
+      const data = await response.json();
+      
+      const latestVersion = data.version;
+      const isNewer = compareVersions(latestVersion, APP_VERSION) > 0;
+      
+      if (isNewer) {
+        setUpdateInfo(data);
+        setShowUpdateModal(true);
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) {
+            await reg.update().catch(() => {});
+          }
+        }
+      } else {
+        setUpdateStatusMsg(t('app_up_to_date'));
+        setTimeout(() => setUpdateStatusMsg(null), 4000);
+      }
+    } catch (err) {
+      console.error('Check update failed:', err);
+      setUpdateError(t('update_connection_error'));
+      setTimeout(() => setUpdateError(null), 5000);
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const compareVersions = (v1: string, v2: string) => {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const p1 = parts1[i] || 0;
+      const p2 = parts2[i] || 0;
+      if (p1 > p2) return 1;
+      if (p1 < p2) return -1;
+    }
+    return 0;
+  };
+
   const handleOfficialCurrencyChange = (code: string) => {
     setOfficialCurrency(code);
     setOfficialCurrencyState(code);
+    if (helperCurrency === code) {
+      const newHelper = code === 'USD' ? 'IQD' : 'USD';
+      setHelperCurrencyState(newHelper);
+      setPOSHelperCurrency(newHelper);
+    }
+  };
+
+  const handleHelperCurrencyChange = (code: string) => {
+    setHelperCurrencyState(code);
+    setPOSHelperCurrency(code);
+  };
+
+  const handleExchangeRateChange = (val: number) => {
+    setExchangeRateState(val);
+    setPOSExchangeRate(val);
   };
 
   const handleAddCurrency = (e: React.FormEvent) => {
@@ -905,6 +984,47 @@ export const Settings = () => {
                 </select>
             </div>
 
+            {/* Select Helper Currency */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-4 border-t border-black/5 dark:border-white/5">
+                <div>
+                    <h4 className="font-medium text-lg">{t('default_helper_currency')}</h4>
+                    <p className="text-sm text-gray-500">{t('default_helper_currency_desc')}</p>
+                </div>
+                <select 
+                    value={helperCurrency}
+                    onChange={(e) => handleHelperCurrencyChange(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all font-medium"
+                >
+                    {currencies
+                      .filter(c => c.code !== officialCurrency)
+                      .map(c => (
+                        <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol})
+                        </option>
+                    ))}
+                </select>
+            </div>
+
+            {/* Default Exchange Rate Helper */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-4 border-t border-black/5 dark:border-white/5">
+                <div>
+                    <h4 className="font-medium text-lg">{t('default_exchange_rate')}</h4>
+                    <p className="text-sm text-gray-500">{t('default_exchange_rate_desc')}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">1 {helperCurrency} =</span>
+                    <input 
+                        type="number"
+                        min="0"
+                        step="0.000001"
+                        value={exchangeRate || ''}
+                        onChange={(e) => handleExchangeRateChange(Number(e.target.value))}
+                        className="flex-1 px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono"
+                    />
+                    <span className="font-mono text-sm">{currencies.find(c => c.code === officialCurrency)?.symbol || officialCurrency}</span>
+                </div>
+            </div>
+
             {/* Add Custom Currency Form */}
             <div className="pt-6 border-t border-black/5 dark:border-white/5">
                 <h4 className="font-medium text-lg mb-4">{t('add_custom_currency')}</h4>
@@ -1183,6 +1303,124 @@ export const Settings = () => {
                       </tbody>
                   </table>
               </div>
+          </div>
+        </div>
+      )}
+
+      {/* System Update Card */}
+      <div className="bg-white dark:bg-[#1f2028] p-6 rounded-xl shadow-sm border border-black/10 dark:border-white/10">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-black/5 dark:border-white/5">
+          <ArrowUpCircle className="text-[var(--color-primary)]" size={28} />
+          <h3 className="text-xl font-semibold">{t('system_update')}</h3>
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h4 className="font-medium text-lg">{t('check_updates')}</h4>
+            <p className="text-sm text-gray-500 mt-1">
+              {t('current_version')}: <span className="font-mono font-semibold bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">{APP_VERSION}</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={handleCheckForUpdates}
+              disabled={checkingUpdates}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--color-primary)] text-white font-semibold rounded-lg hover:brightness-110 active:scale-95 disabled:opacity-50 transition-all cursor-pointer w-full sm:w-auto"
+            >
+              {checkingUpdates ? (
+                <>
+                  <RefreshCcw size={16} className="animate-spin" />
+                  {t('checking_updates')}
+                </>
+              ) : (
+                t('check_updates')
+              )}
+            </button>
+          </div>
+        </div>
+
+        {updateStatusMsg && (
+          <div className="mt-4 p-3 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 rounded-xl text-sm font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+            <span>✅</span>
+            <span>{updateStatusMsg}</span>
+          </div>
+        )}
+
+        {updateError && (
+          <div className="mt-4 p-3 bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 rounded-xl text-sm font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+            <span>⚠️</span>
+            <span>{updateError}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Update Changelog Modal */}
+      {showUpdateModal && updateInfo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#1f2028] text-[var(--text)] rounded-2xl w-full max-w-lg shadow-2xl border border-black/10 dark:border-white/10 p-6 flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-black/5 dark:border-white/5">
+              <h3 className="text-xl font-bold flex items-center gap-2 text-[var(--color-primary)]">
+                <ArrowUpCircle size={22} />
+                {t('update_available')}
+              </h3>
+              <button 
+                onClick={() => setShowUpdateModal(false)}
+                className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div>
+                <span className="text-xs text-gray-400 block mb-1">{t('release_details')}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-bold font-mono text-[var(--color-primary)]">{updateInfo.version}</span>
+                  <span className="text-xs text-gray-500 font-mono">({updateInfo.release_date})</span>
+                </div>
+              </div>
+
+              <div className="border-t border-black/5 dark:border-white/5 pt-3">
+                <h4 className="font-semibold text-sm mb-2">{i18n.language === 'ar' ? 'ما الجديد في هذا التحديث:' : 'What\'s new in this release:'}</h4>
+                <ul className="list-disc list-inside space-y-1.5 text-sm text-gray-600 dark:text-gray-300" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
+                  {(i18n.language === 'ar' ? updateInfo.changelog_ar : updateInfo.changelog_en).map((line, idx) => (
+                    <li key={idx} className="leading-relaxed">
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-black/5 dark:border-white/5">
+              <button 
+                type="button"
+                onClick={() => setShowUpdateModal(false)}
+                className="px-5 py-2 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium cursor-pointer text-sm"
+              >
+                {t('update_later')}
+              </button>
+              <button 
+                type="button"
+                onClick={async () => {
+                  setShowUpdateModal(false);
+                  setCheckingUpdates(true);
+                  try {
+                    await updateServiceWorker(true);
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 1500);
+                  } catch (e) {
+                    console.error(e);
+                    window.location.reload();
+                  }
+                }}
+                className="px-5 py-2 rounded-lg bg-[var(--color-primary)] text-white hover:brightness-110 active:scale-95 transition-all font-semibold cursor-pointer text-sm"
+              >
+                {t('update_now')}
+              </button>
+            </div>
           </div>
         </div>
       )}

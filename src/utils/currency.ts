@@ -66,7 +66,10 @@ export const setPOSExchangeRate = (rate: number) => {
 };
 
 export const getPOSHelperCurrency = (): string => {
-  return localStorage.getItem('pos_helper_currency') || 'USD';
+  const official = getOfficialCurrency().code;
+  const saved = localStorage.getItem('pos_helper_currency');
+  if (saved && saved !== official) return saved;
+  return official === 'USD' ? 'IQD' : 'USD';
 };
 
 export const setPOSHelperCurrency = (code: string) => {

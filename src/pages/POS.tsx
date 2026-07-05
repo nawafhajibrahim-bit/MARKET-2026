@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
-import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList } from '../utils/currency';
+import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList, getPOSHelperCurrency, setPOSHelperCurrency } from '../utils/currency';
 import { Receipt } from '../components/Receipt';
 import { useCart } from '../hooks/useCart';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -258,10 +258,47 @@ export const POS = () => {
 
   // Helper Calculator State
   const [showConverter, setShowConverter] = useState(false);
-  const [helperCurrencyCode, setHelperCurrencyCode] = useState(() => {
-    return officialCurrency.code === 'USD' ? 'IQD' : 'USD';
+  const [helperCurrencyCode, setHelperCurrencyCodeState] = useState(() => {
+    return getPOSHelperCurrency();
   });
   const [customRate, setCustomRate] = useState(defaultRate);
+
+  const getInitialBaseAndQuote = (official: string, helper: string) => {
+    if (helper === 'USD' || helper === 'EUR') {
+      return { base: helper, quote: official };
+    }
+    if (official === 'USD' || official === 'EUR') {
+      return { base: official, quote: helper };
+    }
+    return { base: helper, quote: official };
+  };
+
+  const [rateBaseCode, setRateBaseCode] = useState(() => getInitialBaseAndQuote(officialCurrency.code, helperCurrencyCode).base);
+  const [rateQuoteCode, setRateQuoteCode] = useState(() => getInitialBaseAndQuote(officialCurrency.code, helperCurrencyCode).quote);
+
+  // Inputs for cash paid
+  const [paidOfficial, setPaidOfficial] = useState<string>('');
+  const [paidHelper, setPaidHelper] = useState<string>('');
+
+  const setHelperCurrencyCode = (code: string) => {
+    setHelperCurrencyCodeState(code);
+    setPOSHelperCurrency(code);
+  };
+
+  useEffect(() => {
+    const { base, quote } = getInitialBaseAndQuote(officialCurrency.code, helperCurrencyCode);
+    setRateBaseCode(base);
+    setRateQuoteCode(quote);
+
+    const isUsdIqd = (base === 'USD' && quote === 'IQD') || (base === 'IQD' && quote === 'USD');
+    if (isUsdIqd) {
+      setCustomRate(getPOSExchangeRate());
+    } else {
+      setCustomRate(1);
+    }
+    setPaidOfficial('');
+    setPaidHelper('');
+  }, [helperCurrencyCode, officialCurrency.code]);
 
   // Load products reactively
   useEffect(() => {
@@ -383,7 +420,7 @@ export const POS = () => {
 
         invoiceItems.push({
           product_id: prodId,
-          unit_used: item.selectedUnit ? item.selectedUnit.unit_name : 'piece',
+          unit_used: item.selectedUnit ? item.selectedUnit.unit_name : (item.product.unit || 'piece'),
           quantity: item.quantity,
           price: item.selectedUnit ? item.selectedUnit.price_per_unit : req.doc.toJSON().sale_price
         });
@@ -550,10 +587,10 @@ export const POS = () => {
                   </div>
                   <div>
                     <div className="text-center text-[var(--color-primary)] font-bold text-sm" dir="ltr">
-                      {formatCurrency(p.sale_price)}
+                      {formatCurrency(p.sale_price)} / {t(`unit_${p.unit || 'piece'}`, { defaultValue: p.unit || 'piece' })}
                     </div>
                     <div className="text-center text-xs text-gray-400 mt-1">
-                      {t('stock')}: {p.stock_quantity}
+                      {t('stock')}: {p.stock_quantity} {t(`unit_${p.unit || 'piece'}`, { defaultValue: p.unit || 'piece' })}
                     </div>
                   </div>
                 </div>
@@ -600,22 +637,25 @@ export const POS = () => {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h4 className="font-semibold text-sm line-clamp-1">{displayName}</h4>
-                      {prodUnits.length > 0 ? (
-                        <select
-                          value={item.selectedUnit ? item.selectedUnit.unit_id : 'base'}
-                          onChange={(e) => handleUnitChangeInCart(index, e.target.value)}
-                          className="mt-1 p-1 pr-4 rounded bg-black/5 dark:bg-white/5 text-xs outline-none cursor-pointer border border-transparent focus:border-[var(--color-primary)]"
-                        >
-                          <option value="base">{t('unit_piece')} ({formatCurrency(item.product.sale_price)})</option>
-                          {prodUnits.map((u, i) => (
-                            <option key={i} value={u.unit_id}>
-                              {u.unit_name} (x{u.conversion_factor}) - {formatCurrency(u.price_per_unit)}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs text-gray-400">{t('unit_piece')}</span>
-                      )}
+                      {(() => {
+                        const baseUnitLabel = t(`unit_${item.product.unit || 'piece'}`, { defaultValue: item.product.unit || 'piece' });
+                        return prodUnits.length > 0 ? (
+                          <select
+                            value={item.selectedUnit ? item.selectedUnit.unit_id : 'base'}
+                            onChange={(e) => handleUnitChangeInCart(index, e.target.value)}
+                            className="mt-1 p-1 pr-4 rounded bg-black/5 dark:bg-white/5 text-xs outline-none cursor-pointer border border-transparent focus:border-[var(--color-primary)]"
+                          >
+                            <option value="base">{baseUnitLabel} ({formatCurrency(item.product.sale_price)})</option>
+                            {prodUnits.map((u, i) => (
+                              <option key={i} value={u.unit_id}>
+                                {u.unit_name} (x{u.conversion_factor}) - {formatCurrency(u.price_per_unit)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-gray-400">{baseUnitLabel}</span>
+                        );
+                      })()}
                     </div>
                     
                     <button 
@@ -816,19 +856,52 @@ export const POS = () => {
 
                   {showConverter && (() => {
                     const finalTotal = calculateFinalTotal();
-                    const isHelperStronger = helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR';
-                    const convertedAmount = isHelperStronger 
-                      ? (finalTotal / (customRate || 1)) 
-                      : (finalTotal * customRate);
+                    
+                    const getHelperAmount = (officialAmount: number) => {
+                      if (rateBaseCode === helperCurrencyCode) {
+                        return customRate > 0 ? officialAmount / customRate : 0;
+                      } else {
+                        return officialAmount * customRate;
+                      }
+                    };
+
+                    const amountToCollectInHelper = getHelperAmount(finalTotal);
+                    const helperSymbol = currenciesList.find(c => c.code === helperCurrencyCode)?.symbol || helperCurrencyCode;
+
+                    const paidOfficialVal = Number(paidOfficial) || 0;
+                    const paidHelperVal = Number(paidHelper) || 0;
+
+                    let paidHelperInOfficial = 0;
+                    if (rateBaseCode === helperCurrencyCode) {
+                      paidHelperInOfficial = paidHelperVal * customRate;
+                    } else {
+                      paidHelperInOfficial = customRate > 0 ? paidHelperVal / customRate : 0;
+                    }
+
+                    const totalPaidInOfficial = paidOfficialVal + paidHelperInOfficial;
+                    const remainingInOfficial = finalTotal - totalPaidInOfficial;
+                    
+                    const handleSwapRateDirection = () => {
+                      const oldBase = rateBaseCode;
+                      const oldQuote = rateQuoteCode;
+                      setRateBaseCode(oldQuote);
+                      setRateQuoteCode(oldBase);
+                      if (customRate > 0) {
+                        const inverted = Math.round((1 / customRate) * 1000000) / 1000000;
+                        setCustomRate(inverted);
+                      }
+                    };
+
                     return (
-                      <div className="space-y-3 bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-black/5 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-4 bg-black/5 dark:bg-white/5 p-4 rounded-xl border border-black/5 dark:border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
+                        {/* Rate and Currency Selector */}
+                        <div className="grid grid-cols-2 gap-3 items-end">
                           <div>
-                            <label className="block text-[10px] font-medium text-gray-400 mb-0.5">{t('pay_currency')}</label>
+                            <label className="block text-[10px] font-medium text-gray-400 mb-1">{t('pay_currency')}</label>
                             <select
                               value={helperCurrencyCode}
                               onChange={(e) => setHelperCurrencyCode(e.target.value)}
-                              className="w-full p-1.5 text-xs rounded bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10 outline-none"
+                              className="w-full p-2 text-xs rounded-lg bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10 outline-none focus:border-[var(--color-primary)] font-medium"
                             >
                               {currenciesList
                                 .filter(c => c.code !== officialCurrency.code)
@@ -840,28 +913,155 @@ export const POS = () => {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-medium text-gray-400 mb-0.5">
-                              {helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR'
-                                ? `1 ${helperCurrencyCode} =`
-                                : `1 ${officialCurrency.code} =`
-                              }
+                            <label className="block text-[10px] font-medium text-gray-400 mb-1">
+                              1 {rateBaseCode} =
                             </label>
-                            <input
-                              type="number"
-                              value={customRate || ''}
-                              onChange={(e) => setCustomRate(Number(e.target.value))}
-                              className="w-full p-1.5 text-xs rounded bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10 font-mono outline-none"
-                            />
+                            <div className="relative flex items-center">
+                              <input
+                                type="number"
+                                step="0.000001"
+                                value={customRate || ''}
+                                onChange={(e) => setCustomRate(Number(e.target.value))}
+                                className="w-full p-2 pr-12 text-xs rounded-lg bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10 font-mono outline-none focus:border-[var(--color-primary)]"
+                              />
+                              <span className="absolute right-2 text-[10px] font-semibold text-gray-400 font-mono">
+                                {rateQuoteCode}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-center pt-2 border-t border-black/5 dark:border-white/5">
-                          <span className="text-xs text-gray-500">{t('amount_to_collect')}:</span>
-                          <p className="text-lg font-bold text-green-500 font-mono mt-0.5" dir="ltr">
-                            {convertedAmount.toLocaleString(undefined, {
-                              minimumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
-                              maximumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
-                            })} {currenciesList.find(c => c.code === helperCurrencyCode)?.symbol || helperCurrencyCode}
-                          </p>
+
+                        {/* Swap Rate Direction Button */}
+                        <button
+                          type="button"
+                          onClick={handleSwapRateDirection}
+                          className="w-full py-1.5 px-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/5 dark:border-white/5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors text-[var(--color-primary)]"
+                        >
+                          {t('swap_rate_direction')}
+                        </button>
+
+                        {/* Show Conversion Formula & Totals */}
+                        <div className="bg-white/40 dark:bg-black/40 p-3 rounded-lg border border-black/5 dark:border-white/5 space-y-2">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-400">{t('amount_to_collect')}:</span>
+                            <span className="font-bold text-green-500 font-mono text-sm" dir="ltr">
+                              {amountToCollectInHelper.toLocaleString(undefined, {
+                                minimumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
+                                maximumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
+                              })} {helperSymbol}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-gray-400 text-center border-t border-black/5 dark:border-white/5 pt-1.5 font-mono">
+                            {t('or_equivalent', {
+                              amount: finalTotal.toLocaleString(),
+                              symbol: officialCurrency.symbol
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Mixed Cash Calculator */}
+                        <div className="pt-3 border-t border-black/10 dark:border-white/10 space-y-3">
+                          <span className="block text-[11px] font-bold text-gray-400">{t('mixed_payment_calc')}</span>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[9px] font-medium text-gray-400 mb-0.5">
+                                {t('paid_in_official', { currency: officialCurrency.code })}
+                              </label>
+                              <div className="relative flex items-center">
+                                <input
+                                  type="number"
+                                  value={paidOfficial}
+                                  onChange={(e) => setPaidOfficial(e.target.value)}
+                                  placeholder="0"
+                                  className="w-full p-1.5 text-xs rounded bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10 font-mono outline-none"
+                                />
+                                <span className="absolute right-2 text-[9px] font-bold text-gray-400">{officialCurrency.symbol}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[9px] font-medium text-gray-400 mb-0.5">
+                                {t('paid_in_helper', { currency: helperCurrencyCode })}
+                              </label>
+                              <div className="relative flex items-center">
+                                <input
+                                  type="number"
+                                  value={paidHelper}
+                                  onChange={(e) => setPaidHelper(e.target.value)}
+                                  placeholder="0.00"
+                                  className="w-full p-1.5 text-xs rounded bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10 font-mono outline-none"
+                                />
+                                <span className="absolute right-2 text-[9px] font-bold text-gray-400">{helperSymbol}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick Payment Preset Buttons */}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPaidOfficial(finalTotal.toString());
+                                setPaidHelper('');
+                              }}
+                              className="flex-1 py-1 px-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/5 dark:border-white/5 rounded text-[9px] font-medium transition-colors cursor-pointer"
+                            >
+                              {t('pay_full_official', { currency: officialCurrency.code })}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPaidHelper(amountToCollectInHelper.toFixed(helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0));
+                                setPaidOfficial('');
+                              }}
+                              className="flex-1 py-1 px-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/5 dark:border-white/5 rounded text-[9px] font-medium transition-colors cursor-pointer"
+                            >
+                              {t('pay_full_helper', { currency: helperCurrencyCode })}
+                            </button>
+                          </div>
+
+                          {/* Cash Calculator Results */}
+                          {totalPaidInOfficial > 0 && (
+                            <div className="bg-black/5 dark:bg-white/5 p-2.5 rounded-lg border border-black/5 dark:border-white/5 space-y-1.5 animate-in fade-in duration-200">
+                              {remainingInOfficial > 0.01 ? (
+                                <div className="text-center">
+                                  <span className="text-[10px] text-orange-500 font-semibold">{t('remaining_to_pay')}:</span>
+                                  <div className="flex justify-center gap-3 mt-0.5">
+                                    <p className="text-xs font-bold text-orange-500 font-mono">
+                                      {remainingInOfficial.toLocaleString(undefined, { maximumFractionDigits: 2 })} {officialCurrency.symbol}
+                                    </p>
+                                    <p className="text-xs font-bold text-orange-500 font-mono">
+                                      {getHelperAmount(remainingInOfficial).toLocaleString(undefined, {
+                                        minimumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
+                                        maximumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
+                                      })} {helperSymbol}
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : remainingInOfficial < -0.01 ? (
+                                <div className="text-center">
+                                  <span className="text-[10px] text-green-500 font-bold">{t('change_to_return')}:</span>
+                                  <div className="flex justify-center gap-3 mt-0.5">
+                                    <p className="text-xs font-bold text-green-500 font-mono">
+                                      {Math.abs(remainingInOfficial).toLocaleString(undefined, { maximumFractionDigits: 2 })} {officialCurrency.symbol}
+                                    </p>
+                                    <p className="text-xs font-bold text-green-500 font-mono">
+                                      {getHelperAmount(Math.abs(remainingInOfficial)).toLocaleString(undefined, {
+                                        minimumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
+                                        maximumFractionDigits: helperCurrencyCode === 'USD' || helperCurrencyCode === 'EUR' ? 2 : 0,
+                                      })} {helperSymbol}
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-center py-1">
+                                  <span className="text-xs font-bold text-green-500 flex items-center justify-center gap-1">
+                                    {t('paid_in_full')}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

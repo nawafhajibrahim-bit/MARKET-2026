@@ -65,7 +65,10 @@ export const initDB = async (): Promise<RxDatabase> => {
             products: {
                 schema: productSchema,
                 migrationStrategies: {
-                    // 1: (oldDoc) => oldDoc,  // example: migrate v0 → v1 (identity)
+                    1: (oldDoc: any) => ({
+                        ...oldDoc,
+                        unit: oldDoc.unit || 'piece'
+                    })
                 }
             },
             units: {
@@ -134,7 +137,8 @@ const seedDemoData = async (db: any) => {
                     sale_price: 1500,
                     stock_quantity: 50,
                     min_safety_stock: 5,
-                    expiry_date: "2026-12-31"
+                    expiry_date: "2026-12-31",
+                    unit: "piece"
                 },
                 {
                     id: "demo-prod-2",
@@ -147,7 +151,8 @@ const seedDemoData = async (db: any) => {
                     sale_price: 11000,
                     stock_quantity: 20,
                     min_safety_stock: 3,
-                    expiry_date: "2027-06-30"
+                    expiry_date: "2027-06-30",
+                    unit: "piece"
                 },
                 {
                     id: "demo-prod-3",
@@ -160,7 +165,8 @@ const seedDemoData = async (db: any) => {
                     sale_price: 4500,
                     stock_quantity: 30,
                     min_safety_stock: 5,
-                    expiry_date: "2026-10-15"
+                    expiry_date: "2026-10-15",
+                    unit: "piece"
                 },
                 {
                     id: "demo-prod-4",
@@ -173,7 +179,8 @@ const seedDemoData = async (db: any) => {
                     sale_price: 3750,
                     stock_quantity: 15,
                     min_safety_stock: 2,
-                    expiry_date: "2028-05-20"
+                    expiry_date: "2028-05-20",
+                    unit: "piece"
                 },
                 {
                     id: "demo-prod-5",
@@ -186,7 +193,8 @@ const seedDemoData = async (db: any) => {
                     sale_price: 1800,
                     stock_quantity: 40,
                     min_safety_stock: 4,
-                    expiry_date: "2028-01-01"
+                    expiry_date: "2028-01-01",
+                    unit: "piece"
                 }
             ];
 

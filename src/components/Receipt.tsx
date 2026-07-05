@@ -95,7 +95,9 @@ export const Receipt = ({ invoice, cart, settings }: ReceiptProps) => {
         <div className="border-t border-dashed border-black my-1"></div>
         {cart.map((item, idx) => {
           const displayName = isAr ? item.product.name_ar : item.product.name_en;
-          const unitName = item.selectedUnit ? item.selectedUnit.unit_name : t('unit_piece');
+          const unitName = item.selectedUnit 
+            ? item.selectedUnit.unit_name 
+            : t(`unit_${item.product.unit || 'piece'}`, { defaultValue: item.product.unit || 'piece' });
           const price = item.selectedUnit ? item.selectedUnit.price_per_unit : item.product.sale_price;
           
           return (
