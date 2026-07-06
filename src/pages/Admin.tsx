@@ -112,7 +112,7 @@ export const Admin = () => {
     }
   };
 
-  const fetchLicensesList = async () => {
+  async function fetchLicensesList() {
     if (!adminSecret) {
       alert(isAr ? 'يرجى إدخال رمز الأدمن أولاً لجلب التراخيص' : 'Please enter admin secret first');
       return;
@@ -141,7 +141,7 @@ export const Admin = () => {
     } finally {
       setListLoading(false);
     }
-  };
+  }
 
   const openEditModal = (key: string, license: any) => {
     setEditingLicenseKey(key);

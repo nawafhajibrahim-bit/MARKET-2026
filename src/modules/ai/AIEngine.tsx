@@ -211,7 +211,7 @@ ${dbContext}
                 to="/settings" 
                 className="inline-flex items-center gap-1 font-bold text-xs text-[var(--color-primary)] hover:underline"
               >
-                {t('i18n_language')?.startsWith?.('ar') || true ? 'الانتقال إلى الإعدادات لمشاهدة طريقة إضافة مفتاحك الخاص 👈' : 'Go to Settings to see how to add your own key 👈'}
+                {t('i18n_language')?.startsWith?.('ar') ? 'الانتقال إلى الإعدادات لمشاهدة طريقة إضافة مفتاحك الخاص 👈' : 'Go to Settings to see how to add your own key 👈'}
               </Link>
             </div>
           </div>

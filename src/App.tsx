@@ -14,7 +14,6 @@ import { LicenseInterceptor } from './components/LicenseInterceptor';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import { DevReset } from './pages/DevReset';
-import { formatLegacyHash } from './services/passwordService';
 import { useAuth } from './contexts/AuthContext';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_VERSION } from './utils/version';
@@ -28,21 +27,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
 
   useEffect(() => {
-    const checkDefaultPassword = async () => {
-      if (currentUser) {
-        try {
-          const defaultHash = await formatLegacyHash('admin');
-          if (currentUser.role === 'admin' && currentUser.password_hash === defaultHash) {
-            setNeedsPasswordChange(true);
-          } else {
-            setNeedsPasswordChange(false);
-          }
-        } catch (err) {
-          console.error('Failed to check default password:', err);
-        }
-      }
-    };
-    checkDefaultPassword();
+    // Disabled checking for default password to allow trial users 
+    // to use the application with default credentials.
+    setNeedsPasswordChange(false);
   }, [currentUser]);
 
   if (loading) {
@@ -115,6 +102,23 @@ function App() {
         };
 
         if (compareVersions(data.version, APP_VERSION) > 0) {
+          // 1) Developer control: check if developer disabled notifications explicitly
+          if (data.notify_users === false) return;
+          
+          // 2) Developer control: check if there is a delayed notification date
+          if (data.notify_after && new Date() < new Date(data.notify_after)) return;
+
+          // 3) User control: check if user dismissed this specific version recently (e.g. 24h)
+          const dismissedData = localStorage.getItem('dismissed_update');
+          if (dismissedData) {
+            try {
+              const { version, time } = JSON.parse(dismissedData);
+              if (version === data.version && Date.now() - time < 24 * 60 * 60 * 1000) {
+                return; // skip showing banner for 24 hours
+              }
+            } catch (e) {}
+          }
+
           setUpdateInfo(data);
           setShowBanner(true);
           
@@ -184,7 +188,10 @@ function App() {
             </div>
           </div>
           <button 
-            onClick={() => setShowBanner(false)}
+            onClick={() => {
+              setShowBanner(false);
+              localStorage.setItem('dismissed_update', JSON.stringify({ version: updateInfo.version, time: Date.now() }));
+            }}
             className="p-1 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
           >
             <X size={18} />
@@ -202,7 +209,10 @@ function App() {
                 {i18n.language.startsWith('ar') ? 'تحديث البرنامج المتوفر' : 'Available Software Update'}
               </h3>
               <button 
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  localStorage.setItem('dismissed_update', JSON.stringify({ version: updateInfo.version, time: Date.now() }));
+                }}
                 className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
               >
                 <X size={20} />
@@ -235,7 +245,10 @@ function App() {
             <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-black/5 dark:border-white/5">
               <button 
                 type="button"
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  localStorage.setItem('dismissed_update', JSON.stringify({ version: updateInfo.version, time: Date.now() }));
+                }}
                 className="px-5 py-2 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium cursor-pointer text-sm"
               >
                 {i18n.language.startsWith('ar') ? 'لاحقاً' : 'Later'}

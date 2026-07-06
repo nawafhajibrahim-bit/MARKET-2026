@@ -67,44 +67,27 @@ export const initDB = async (): Promise<RxDatabase> => {
                 migrationStrategies: {
                     1: (oldDoc: any) => {
                         try {
-                            const cleaned: any = { ...oldDoc };
-                            
-                            if (typeof cleaned.unit !== 'string' || !cleaned.unit.trim()) {
-                                cleaned.unit = 'piece';
-                            }
-                            
-                            if (typeof cleaned.id !== 'string') cleaned.id = String(cleaned.id || '');
-                            if (typeof cleaned.barcode !== 'string') cleaned.barcode = String(cleaned.barcode || '');
-                            if (typeof cleaned.category !== 'string') cleaned.category = String(cleaned.category || '');
-                            if (typeof cleaned.name_ar !== 'string') cleaned.name_ar = String(cleaned.name_ar || '');
-                            
-                            if (typeof cleaned.cost_price !== 'number' || isNaN(cleaned.cost_price)) cleaned.cost_price = Number(cleaned.cost_price) || 0;
-                            if (typeof cleaned.sale_price !== 'number' || isNaN(cleaned.sale_price)) cleaned.sale_price = Number(cleaned.sale_price) || 0;
-                            if (typeof cleaned.stock_quantity !== 'number' || isNaN(cleaned.stock_quantity)) cleaned.stock_quantity = Number(cleaned.stock_quantity) || 0;
-                            
-                            if (cleaned.sku_serial === null || cleaned.sku_serial === undefined) {
-                                delete cleaned.sku_serial;
-                            } else if (typeof cleaned.sku_serial !== 'string') {
-                                cleaned.sku_serial = String(cleaned.sku_serial);
-                            }
-                            
-                            if (cleaned.name_en === null || cleaned.name_en === undefined) {
-                                delete cleaned.name_en;
-                            } else if (typeof cleaned.name_en !== 'string') {
-                                cleaned.name_en = String(cleaned.name_en);
-                            }
+                            const cleaned: any = {
+                                id: String(oldDoc?.id || 'unknown'),
+                                barcode: String(oldDoc?.barcode || ''),
+                                name_ar: String(oldDoc?.name_ar || 'unknown'),
+                                category: String(oldDoc?.category || 'unknown'),
+                                cost_price: Number(oldDoc?.cost_price) || 0,
+                                sale_price: Number(oldDoc?.sale_price) || 0,
+                                stock_quantity: Number(oldDoc?.stock_quantity) || 0,
+                                unit: typeof oldDoc?.unit === 'string' && oldDoc.unit.trim() ? oldDoc.unit : 'piece'
+                            };
 
-                            if (cleaned.min_safety_stock === null || cleaned.min_safety_stock === undefined) {
-                                delete cleaned.min_safety_stock;
-                            } else if (typeof cleaned.min_safety_stock !== 'number' || isNaN(cleaned.min_safety_stock)) {
-                                cleaned.min_safety_stock = Number(cleaned.min_safety_stock) || 0;
-                            }
+                            if (oldDoc?.sku_serial != null) cleaned.sku_serial = String(oldDoc.sku_serial);
+                            if (oldDoc?.name_en != null) cleaned.name_en = String(oldDoc.name_en);
+                            if (oldDoc?.min_safety_stock != null) cleaned.min_safety_stock = Number(oldDoc.min_safety_stock) || 0;
+                            if (oldDoc?.expiry_date != null) cleaned.expiry_date = String(oldDoc.expiry_date);
 
-                            if (cleaned.expiry_date === null || cleaned.expiry_date === undefined) {
-                                delete cleaned.expiry_date;
-                            } else if (typeof cleaned.expiry_date !== 'string') {
-                                cleaned.expiry_date = String(cleaned.expiry_date);
-                            }
+                            // Keep internal RxDB fields required for migration
+                            if (oldDoc?._deleted != null) cleaned._deleted = oldDoc._deleted;
+                            if (oldDoc?._attachments != null) cleaned._attachments = oldDoc._attachments;
+                            if (oldDoc?._meta != null) cleaned._meta = oldDoc._meta;
+                            if (oldDoc?._rev != null) cleaned._rev = oldDoc._rev;
 
                             return cleaned;
                         } catch (err) {
