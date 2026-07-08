@@ -38,7 +38,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({ onScan, 
             onClose();
           }
         },
-        (errorMessage) => {
+        () => {
           // Ignore frequent "not found" errors, only log actual failures if needed
         }
       );
