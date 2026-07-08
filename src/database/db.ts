@@ -14,7 +14,8 @@ import {
     debtSchema,
     systemConfigSchema,
     userSchema,
-    branchSchema
+    branchSchema,
+    purchaseSchema
 } from './schema';
 
 if (import.meta.env.DEV) {
@@ -139,6 +140,10 @@ export const initDB = async (): Promise<RxDatabase> => {
             },
             branches: {
                 schema: branchSchema,
+                migrationStrategies: {}
+            },
+            purchases: {
+                schema: purchaseSchema,
                 migrationStrategies: {}
             }
         });

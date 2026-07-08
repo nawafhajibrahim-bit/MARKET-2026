@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle, ShieldCheck } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +23,7 @@ import {
 
 export const Settings = () => {
   const { t, i18n } = useTranslation();
+  const isAr = i18n.language.startsWith('ar');
   const db = useDb();
   
   const { currentUser, isAdmin } = useAuth();
@@ -96,6 +97,21 @@ export const Settings = () => {
   const [shopAddress, setShopAddress] = useState(() => localStorage.getItem('receipt_shop_address') || '');
   const [receiptFooter, setReceiptFooter] = useState(() => localStorage.getItem('receipt_footer') || '');
   const [printSuccess, setPrintSuccess] = useState<string | null>(null);
+
+  // License Request States
+  const [sysConfig, setSysConfig] = useState<any>(null);
+  const [reqDuration, setReqDuration] = useState<number>(3);
+  const [reqPhone, setReqPhone] = useState<string>('');
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqSuccess, setReqSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (db) {
+      db.system_config.findOne('config').exec().then(doc => {
+        if (doc) setSysConfig(doc.toJSON());
+      });
+    }
+  }, [db]);
 
   const handleSavePrintSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -528,6 +544,46 @@ export const Settings = () => {
       window.removeEventListener('auto_backup_completed', handleBackupCompleted);
     };
   }, [isAdmin]);
+
+  const handleRequestExtension = async () => {
+    if (!sysConfig) return;
+    setReqLoading(true);
+    setReqSuccess(null);
+    try {
+      const res = await fetch('/api/license-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          hardware_fingerprint: sysConfig.hardware_fingerprint || 'unknown',
+          merchant_name: shopName || 'عميل (بدون اسم)',
+          phone: reqPhone,
+          duration_months: reqDuration,
+          current_license_key: sysConfig.license_key || 'trial'
+        })
+      });
+      if (res.ok) {
+        setReqSuccess(isAr ? 'تم إرسال الطلب بنجاح!' : 'Request sent successfully!');
+        
+        // Open WhatsApp
+        const msg = isAr 
+          ? `مرحباً، أود طلب تمديد/ترقية اشتراكي في نظام إدارة المبيعات لمدة ${reqDuration} أشهر.\n\nالاسم: ${shopName || 'عميل'}\nالهاتف: ${reqPhone}\nالمعرف: ${sysConfig.hardware_fingerprint || 'غير متوفر'}\nالترخيص الحالي: ${sysConfig.license_key || 'فترة تجريبية'}`
+          : `Hello, I would like to request a subscription extension for ${reqDuration} months.\n\nName: ${shopName || 'Customer'}\nPhone: ${reqPhone}\nID: ${sysConfig.hardware_fingerprint || 'N/A'}\nCurrent License: ${sysConfig.license_key || 'Trial'}`;
+        
+        const encodedMsg = encodeURIComponent(msg);
+        // Using a generic WhatsApp link that lets the user choose who to send to if we don't know the owner's number,
+        // but typically they send to the owner. We can use wa.me/?text=
+        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+      } else {
+        alert(isAr ? 'حدث خطأ أثناء إرسال الطلب' : 'Failed to send request');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(isAr ? 'خطأ في الاتصال' : 'Network error');
+    } finally {
+      setReqLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
@@ -1143,6 +1199,76 @@ export const Settings = () => {
             )}
         </form>
       </div>
+
+      {/* Subscription Request Card */}
+      {isAdmin && sysConfig && (
+        <div className="bg-white dark:bg-[#1f2028] p-6 rounded-xl shadow-sm border border-black/10 dark:border-white/10 mt-8">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-black/5 dark:border-white/5">
+              <ShieldCheck className="text-[var(--color-primary)]" size={28} />
+              <h3 className="text-xl font-semibold">{isAr ? 'الاشتراك والترخيص' : 'Subscription & License'}</h3>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-purple-500/5 border border-purple-500/10 p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold opacity-70 mb-1">{isAr ? 'حالة الترخيص الحالي:' : 'Current License:'}</p>
+                <p className="font-mono font-bold text-lg text-[var(--color-primary)]">
+                  {sysConfig.license_key || (isAr ? 'فترة تجريبية' : 'Trial Version')}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">ID: {sysConfig.hardware_fingerprint}</p>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium text-lg mb-2">{isAr ? 'طلب تمديد أو ترقية الاشتراك' : 'Request Extension / Upgrade'}</h4>
+              <p className="text-sm text-gray-500 mb-4">
+                {isAr ? 'يمكنك إرسال طلب للمطور لتمديد أو تفعيل اشتراكك السحابي.' : 'Send a request to the developer to extend or activate your cloud subscription.'}
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="w-full sm:w-1/3">
+                  <label className="block text-sm font-medium mb-1">{isAr ? 'مدة التمديد المطلوبة' : 'Requested Duration'}</label>
+                  <select 
+                    value={reqDuration}
+                    onChange={(e) => setReqDuration(Number(e.target.value))}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all"
+                  >
+                    <option value={1}>{isAr ? 'شهر واحد' : '1 Month'}</option>
+                    <option value={3}>{isAr ? '3 أشهر' : '3 Months'}</option>
+                    <option value={6}>{isAr ? '6 أشهر' : '6 Months'}</option>
+                    <option value={12}>{isAr ? 'سنة كاملة' : '1 Year'}</option>
+                  </select>
+                </div>
+                <div className="w-full sm:w-1/3">
+                  <label className="block text-sm font-medium mb-1">{isAr ? 'رقم الهاتف (للتواصل)' : 'Phone Number'}</label>
+                  <input 
+                    type="tel"
+                    required
+                    value={reqPhone}
+                    onChange={(e) => setReqPhone(e.target.value)}
+                    placeholder="e.g. 05XXXXX"
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
+                  />
+                </div>
+                <button 
+                  onClick={handleRequestExtension}
+                  disabled={reqLoading}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-lg transition-all cursor-pointer shadow-md shadow-emerald-500/20"
+                >
+                  {reqLoading ? (isAr ? 'جاري الإرسال...' : 'Sending...') : (isAr ? 'إرسال الطلب الآن' : 'Send Request')}
+                </button>
+              </div>
+              
+              {reqSuccess && (
+                <div className="mt-4 p-3 bg-green-500/10 text-green-600 rounded-lg text-sm font-bold flex items-center gap-2">
+                  <CheckCircle size={18} />
+                  {reqSuccess}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Employee Management Card */}
       {isAdmin && (

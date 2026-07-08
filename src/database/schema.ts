@@ -183,3 +183,43 @@ export const branchSchemaLiteral = {
 export const schemaTypedBranch = toTypedRxJsonSchema(branchSchemaLiteral);
 export type BranchDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedBranch>;
 export const branchSchema: RxJsonSchema<BranchDocType> = branchSchemaLiteral;
+
+// ───────────────────────────────────────────────
+// Purchase schema (Mشتريات والموردين)
+// ───────────────────────────────────────────────
+export const purchaseSchemaLiteral = {
+    title: 'purchase schema',
+    version: 0,
+    primaryKey: 'purchase_id',
+    type: 'object',
+    properties: {
+        purchase_id: { type: 'string', maxLength: 100 },
+        supplier_name: { type: 'string', maxLength: 100 },
+        date: { type: 'string' },
+        items: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    product_id: { type: 'string' },
+                    name: { type: 'string' },
+                    quantity: { type: 'number' },
+                    cost_price: { type: 'number' },
+                    subtotal: { type: 'number' },
+                },
+                required: ['product_id', 'quantity', 'cost_price', 'subtotal']
+            }
+        },
+        total_amount: { type: 'number' },
+        paid_amount: { type: 'number' },
+        remaining_amount: { type: 'number' },
+        status: { type: 'string', maxLength: 50 }, // 'paid' | 'partial' | 'unpaid'
+        notes: { type: 'string' },
+    },
+    required: ['purchase_id', 'supplier_name', 'date', 'items', 'total_amount', 'paid_amount', 'remaining_amount', 'status'],
+    indexes: ['date', 'supplier_name', 'status'],
+} as const;
+export const schemaTypedPurchase = toTypedRxJsonSchema(purchaseSchemaLiteral);
+export type PurchaseDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedPurchase>;
+export const purchaseSchema: RxJsonSchema<PurchaseDocType> = purchaseSchemaLiteral;
+

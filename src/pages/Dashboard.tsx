@@ -11,6 +11,7 @@ const AIEngine = React.lazy(() => import('../modules/ai/AIEngine'));
 
 export const Dashboard = () => {
   const { t, i18n } = useTranslation();
+  const isAr = i18n.language.startsWith('ar');
   const db = useDb();
   const [aiEnabled, setAiEnabled] = useState(false);
   const [showZReport, setShowZReport] = useState(false);
@@ -18,10 +19,12 @@ export const Dashboard = () => {
     invoices: InvoiceDocType[];
     debts: DebtDocType[];
     products: ProductDocType[];
+    sysConfig: any;
   }>({
     invoices: [],
     debts: [],
     products: [],
+    sysConfig: null,
   });
   const [loading, setLoading] = useState(true);
 
@@ -37,10 +40,11 @@ export const Dashboard = () => {
 
     const loadStats = async () => {
       try {
-        const [invoiceDocs, debtDocs, productDocs] = await Promise.all([
+        const [invoiceDocs, debtDocs, productDocs, configDoc] = await Promise.all([
           db.invoices.find().exec(),
           db.debts.find().exec(),
           db.products.find().exec(),
+          db.system_config.findOne('config').exec(),
         ]);
 
         if (isMounted) {
@@ -48,6 +52,7 @@ export const Dashboard = () => {
             invoices: invoiceDocs.map(d => d.toJSON()),
             debts: debtDocs.map(d => d.toJSON()),
             products: productDocs.map(d => d.toJSON()),
+            sysConfig: configDoc ? configDoc.toJSON() : null,
           });
           setLoading(false);
         }
@@ -165,6 +170,15 @@ export const Dashboard = () => {
         return { name, count };
       });
 
+    let licenseDaysRemaining = null;
+    let isTrial = false;
+    if (data.sysConfig && data.sysConfig.license_expiry) {
+      const expDate = new Date(data.sysConfig.license_expiry);
+      const diffMs = expDate.getTime() - now.getTime();
+      licenseDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      isTrial = !data.sysConfig.license_key || data.sysConfig.license_key.trim() === '';
+    }
+
     return {
       todayRevenue,
       monthRevenue,
@@ -176,6 +190,8 @@ export const Dashboard = () => {
       topProducts,
       expiringProducts,
       expiredProducts,
+      licenseDaysRemaining,
+      isTrial,
     };
   }, [data, t, i18n]);
 
@@ -183,6 +199,28 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6">
+      {stats.licenseDaysRemaining !== null && stats.licenseDaysRemaining <= 14 && (
+        <div className={`p-4 rounded-xl flex items-start gap-3 border shadow-sm ${stats.licenseDaysRemaining <= 3 ? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-300' : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
+          <AlertTriangle className="flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-bold text-base">
+              {stats.isTrial ? (isAr ? 'تنبيه انتهاء الفترة التجريبية' : 'Trial Ending Soon') : (isAr ? 'تنبيه انتهاء الاشتراك' : 'Subscription Ending Soon')}
+            </h3>
+            <p className="text-sm mt-1">
+              {isAr 
+                ? `بقي ${stats.licenseDaysRemaining} يوم على انتهاء ${stats.isTrial ? 'الفترة التجريبية' : 'الاشتراك'}. يرجى طلب التمديد لتجنب توقف النظام.`
+                : `Your ${stats.isTrial ? 'trial' : 'subscription'} will expire in ${stats.licenseDaysRemaining} days. Please request an extension to avoid interruption.`
+              }
+            </p>
+            <div className="mt-3">
+              <a href="/settings" className="px-4 py-2 bg-white/50 hover:bg-white border border-black/10 dark:border-white/10 dark:bg-black/20 dark:hover:bg-black/40 rounded-lg text-sm font-bold transition-all cursor-pointer inline-flex">
+                {isAr ? 'اذهب لطلب التمديد من الإعدادات' : 'Go to Settings to Renew'}
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{t('dashboard')}</h2>
         <div className="flex items-center gap-3">

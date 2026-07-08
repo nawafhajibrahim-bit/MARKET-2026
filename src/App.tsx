@@ -8,6 +8,7 @@ import { Inventory } from './pages/Inventory';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Debts } from './pages/Debts';
+import { Purchases } from './pages/Purchases';
 import { SalesHistory } from './pages/SalesHistory';
 import { LoginScreen } from './pages/Login';
 import { LicenseInterceptor } from './components/LicenseInterceptor';
@@ -152,12 +153,13 @@ function App() {
           <Route path="/dev-reset" element={<DevReset />} />
 
           {/* Standalone Admin route for the program owner - only requires ADMIN_SECRET */}
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/owner-portal" element={<Admin />} />
 
           <Route path="/" element={<LicenseInterceptor><AuthGuard><Layout /></AuthGuard></LicenseInterceptor>}>
             <Route index element={<Dashboard />} />
             <Route path="pos" element={<POS />} />
             <Route path="inventory" element={<AdminGuard><Inventory /></AdminGuard>} />
+            <Route path="purchases" element={<AdminGuard><Purchases /></AdminGuard>} />
             <Route path="settings" element={<AdminGuard><Settings /></AdminGuard>} />
             <Route path="debts" element={<Debts />} />
             <Route path="sales-history" element={<SalesHistory />} />

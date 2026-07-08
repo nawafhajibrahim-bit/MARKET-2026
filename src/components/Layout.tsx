@@ -1,13 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDb } from '../database/Provider';
 
 export const Layout = () => {
   const { t, i18n } = useTranslation();
   const { currentUser, currentBranch, availableBranches, logout, isAdmin, switchBranch } = useAuth();
   const location = useLocation();
+  const db = useDb();
+  const [sysConfig, setSysConfig] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [reqPhone, setReqPhone] = useState('');
+  const [reqDuration, setReqDuration] = useState(3);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqSuccess, setReqSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (db) {
+      db.system_config.findOne('config').$.subscribe(doc => {
+        if (doc) setSysConfig(doc.toJSON());
+      });
+    }
+  }, [db]);
+
+  const isTrial = !sysConfig?.license_key || sysConfig?.license_key === '';
 
   const [theme, setTheme] = useState<string>(() => {
     return localStorage.getItem('selected_theme') || 'light';
@@ -30,6 +48,44 @@ export const Layout = () => {
     localStorage.setItem('selected_theme', newTheme);
   };
 
+  const handleRequestExtension = async () => {
+    if (!sysConfig) return;
+    setReqLoading(true);
+    setReqSuccess(null);
+    try {
+      const res = await fetch('/api/license-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          hardware_fingerprint: sysConfig.hardware_fingerprint || 'unknown',
+          merchant_name: localStorage.getItem('receipt_shop_name') || 'عميل (بدون اسم)',
+          phone: reqPhone,
+          duration_months: reqDuration,
+          current_license_key: sysConfig.license_key || 'trial'
+        })
+      });
+      if (res.ok) {
+        setReqSuccess(i18n.language.startsWith('ar') ? 'تم إرسال الطلب بنجاح!' : 'Request sent successfully!');
+        
+        const shopName = localStorage.getItem('receipt_shop_name') || 'عميل';
+        const msg = i18n.language.startsWith('ar') 
+          ? `مرحباً، أود طلب تمديد/ترقية اشتراكي في نظام إدارة المبيعات لمدة ${reqDuration} أشهر.\n\nالاسم: ${shopName}\nالهاتف: ${reqPhone}\nالمعرف: ${sysConfig.hardware_fingerprint || 'غير متوفر'}\nالترخيص الحالي: ${sysConfig.license_key || 'فترة تجريبية'}`
+          : `Hello, I would like to request a subscription extension for ${reqDuration} months.\n\nName: ${shopName}\nPhone: ${reqPhone}\nID: ${sysConfig.hardware_fingerprint || 'N/A'}\nCurrent License: ${sysConfig.license_key || 'Trial'}`;
+        
+        const encodedMsg = encodeURIComponent(msg);
+        window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+      } else {
+        alert(i18n.language.startsWith('ar') ? 'حدث خطأ أثناء إرسال الطلب' : 'Failed to send request');
+      }
+    } catch (err) {
+      console.error(err);
+      alert(i18n.language.startsWith('ar') ? 'خطأ في الاتصال' : 'Network error');
+    } finally {
+      setReqLoading(false);
+    }
+  };
+
   const handleBranchChange = async (branchId: string) => {
     if (branchId) {
       await switchBranch(branchId);
@@ -41,6 +97,7 @@ export const Layout = () => {
     { path: '/', label: t('dashboard'), icon: LayoutDashboard, roles: ['admin', 'manager', 'cashier'] },
     { path: '/pos', label: t('pos'), icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
     { path: '/inventory', label: t('inventory'), icon: Package, roles: ['admin', 'manager'] },
+    { path: '/purchases', label: i18n.language.startsWith('ar') ? 'المشتريات' : 'Purchases', icon: Truck, roles: ['admin', 'manager'] },
     { path: '/sales-history', label: t('sales_history'), icon: FileText, roles: ['admin', 'manager', 'cashier'] },
     { path: '/debts', label: t('debts_nav'), icon: HandCoins, roles: ['admin', 'manager', 'cashier'] },
     { path: '/settings', label: t('settings'), icon: SettingsIcon, roles: ['admin', 'manager'] },
@@ -101,6 +158,16 @@ export const Layout = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {isTrial && isAdmin && (
+            <button
+              onClick={() => setShowUpgradeModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg font-bold text-sm shadow-md transition-all cursor-pointer animate-pulse"
+            >
+              <Crown size={16} />
+              <span className="hidden sm:inline">{t('premium_subscription') || (i18n.language.startsWith('ar') ? 'الاشتراك المدفوع' : 'Premium Plan')}</span>
+            </button>
+          )}
+
           {/* User info */}
           {currentUser && (
             <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500">
@@ -167,6 +234,81 @@ export const Layout = () => {
       <main className="p-4 md:p-8">
         <Outlet />
       </main>
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1f2028] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-black/10 dark:border-white/10 flex items-center justify-between bg-gradient-to-r from-amber-500/10 to-orange-500/10">
+              <div className="flex items-center gap-3">
+                <Crown className="text-orange-500" size={28} />
+                <h3 className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                  {i18n.language.startsWith('ar') ? 'ترقية للنسخة المدفوعة' : 'Upgrade to Premium'}
+                </h3>
+              </div>
+              <button onClick={() => setShowUpgradeModal(false)} className="text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors cursor-pointer">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-5">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {i18n.language.startsWith('ar') 
+                  ? 'احصل على كافة الميزات اللامحدودة وأمان النسخ الاحتياطي السحابي باشتراكك معنا.' 
+                  : 'Get unlimited access and cloud backup by upgrading your plan.'}
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">{i18n.language.startsWith('ar') ? 'المدة المطلوبة' : 'Duration'}</label>
+                <select 
+                  value={reqDuration}
+                  onChange={(e) => setReqDuration(Number(e.target.value))}
+                  className="w-full px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all font-medium"
+                >
+                  <option value={1}>{i18n.language.startsWith('ar') ? 'شهر واحد' : '1 Month'}</option>
+                  <option value={3}>{i18n.language.startsWith('ar') ? '3 أشهر' : '3 Months'}</option>
+                  <option value={6}>{i18n.language.startsWith('ar') ? '6 أشهر' : '6 Months'}</option>
+                  <option value={12}>{i18n.language.startsWith('ar') ? 'سنة كاملة' : '1 Year'}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">{i18n.language.startsWith('ar') ? 'رقم الهاتف للتواصل' : 'Phone Number'}</label>
+                <input 
+                  type="tel"
+                  required
+                  value={reqPhone}
+                  onChange={(e) => setReqPhone(e.target.value)}
+                  placeholder="05XXXXXXXX"
+                  className="w-full px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-medium"
+                />
+              </div>
+
+              {reqSuccess && (
+                <div className="p-3 bg-green-500/10 text-green-600 rounded-xl text-sm font-bold text-center">
+                  {reqSuccess}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-black/10 dark:border-white/10 flex justify-end gap-3 bg-black/5 dark:bg-white/5">
+              <button 
+                onClick={() => setShowUpgradeModal(false)}
+                className="px-5 py-2.5 rounded-xl font-bold text-gray-600 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/10 transition-all cursor-pointer"
+              >
+                {i18n.language.startsWith('ar') ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button 
+                onClick={handleRequestExtension}
+                disabled={reqLoading || !reqPhone}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center min-w-[120px]"
+              >
+                {reqLoading ? '...' : (i18n.language.startsWith('ar') ? 'إرسال الطلب' : 'Send Request')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

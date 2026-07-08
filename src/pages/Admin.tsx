@@ -22,6 +22,10 @@ export const Admin = () => {
   const { i18n } = useTranslation();
   const isAr = i18n.language.startsWith('ar');
 
+  const [isAuthenticatedOwner, setIsAuthenticatedOwner] = useState(() => localStorage.getItem('sm_owner_auth') === 'true');
+  const [ownerUsername, setOwnerUsername] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+
   const [adminSecret, setAdminSecret] = useState(() => localStorage.getItem('sm_developer_secret') || '');
   const [merchantName, setMerchantName] = useState('');
   const [durationMonths, setDurationMonths] = useState(12);
@@ -29,6 +33,10 @@ export const Admin = () => {
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [licensesList, setLicensesList] = useState<Record<string, any>>({});
+  
+  // Tabs & Requests State
+  const [activeTab, setActiveTab] = useState<'licenses' | 'requests'>('licenses');
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,11 +56,12 @@ export const Admin = () => {
 
   // Automatically load licenses on mount if secret is already saved
   useEffect(() => {
-    if (adminSecret) {
+    if (adminSecret && isAuthenticatedOwner) {
       fetchLicensesList();
+      fetchRequestsList();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticatedOwner]);
 
   const generateLicense = () => {
     return 'SM-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
@@ -142,6 +151,74 @@ export const Admin = () => {
       setListLoading(false);
     }
   }
+
+  async function fetchRequestsList() {
+    if (!adminSecret) return;
+    try {
+      const res = await fetch('/api/license-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_secret: adminSecret,
+          action: 'list'
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPendingRequests(data.requests || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  const handleApproveRequest = async (request: any) => {
+    try {
+      // 1. Mark request as approved
+      await fetch('/api/license-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_secret: adminSecret,
+          action: 'approve',
+          request_id: request.id
+        })
+      });
+      
+      // 2. Pre-fill modal
+      setMerchantName(request.merchant_name);
+      setDurationMonths(request.duration_months);
+      setMaxDevices(1);
+      
+      // Refresh requests
+      fetchRequestsList();
+      
+      // Open modal
+      setShowAddModal(true);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    if (!window.confirm(isAr ? 'هل أنت متأكد من حذف هذا الطلب؟' : 'Are you sure you want to delete this request?')) return;
+    try {
+      const res = await fetch('/api/license-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_secret: adminSecret,
+          action: 'delete',
+          request_id: requestId
+        })
+      });
+      if (res.ok) {
+        fetchRequestsList();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const openEditModal = (key: string, license: any) => {
     setEditingLicenseKey(key);
@@ -295,6 +372,73 @@ export const Admin = () => {
   );
 
   // Render Login state
+  if (!isAuthenticatedOwner) {
+    const handleOwnerLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      // Hardcoded owner credentials (Layer 1)
+      if (ownerUsername === 'developer' && ownerPassword === 'dev123') {
+        setIsAuthenticatedOwner(true);
+        localStorage.setItem('sm_owner_auth', 'true');
+      } else {
+        alert(isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password');
+      }
+    };
+
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] px-4">
+        <div className="bg-white dark:bg-[#1f2028] p-8 rounded-2xl shadow-xl border border-black/10 dark:border-white/10 w-full max-w-md space-y-6 text-center animate-in fade-in zoom-in duration-300">
+          <div className="mx-auto w-16 h-16 bg-purple-500/10 flex items-center justify-center rounded-full text-[var(--color-primary)]">
+            <UserCheck size={40} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold mb-2">
+              {isAr ? 'تسجيل دخول المالك' : 'Owner Login'}
+            </h2>
+            <p className="text-sm opacity-60">
+              {isAr ? 'الرجاء إدخال بيانات الدخول الخاصة بالمالك (الطبقة الأولى).' : 'Please enter owner credentials (Layer 1).'}
+            </p>
+          </div>
+          
+          <form onSubmit={handleOwnerLogin} className="space-y-4">
+            <div className="relative">
+              <input 
+                type="text"
+                required
+                value={ownerUsername}
+                onChange={(e) => setOwnerUsername(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-center font-bold tracking-wider"
+                placeholder={isAr ? 'اسم المستخدم (developer)' : 'Username (developer)'}
+              />
+              <Users className="absolute left-3.5 top-3.5 opacity-40" size={18} />
+            </div>
+            <div className="relative">
+              <input 
+                type="password"
+                required
+                value={ownerPassword}
+                onChange={(e) => setOwnerPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-center font-bold tracking-wider"
+                placeholder={isAr ? 'كلمة المرور (dev123)' : 'Password (dev123)'}
+              />
+              <KeyRound className="absolute left-3.5 top-3.5 opacity-40" size={18} />
+            </div>
+            <button
+              type="submit"
+              className="w-full py-3 bg-[var(--color-primary)] hover:brightness-110 text-white rounded-xl active:scale-95 transition-all font-bold cursor-pointer shadow-md shadow-purple-500/20"
+            >
+              {isAr ? 'تسجيل الدخول' : 'Login'}
+            </button>
+          </form>
+          <div className="pt-4 border-t border-black/5 dark:border-white/5 mt-4">
+            <Link to="/" className="text-xs text-[var(--color-primary)] font-bold hover:underline inline-flex items-center gap-1">
+              {isAr ? 'العودة للبرنامج الرئيسي ↩️' : 'Go back to POS App ↩️'}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!adminSecret) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] px-4">
@@ -307,7 +451,7 @@ export const Admin = () => {
               {isAr ? 'بوابة التحكم الآمنة' : 'Secure Admin Portal'}
             </h2>
             <p className="text-sm opacity-60">
-              {isAr ? 'الرجاء إدخال رمز المطور السري لإدارة المشتركين والاشتراكات سحابياً.' : 'Enter developer secret to manage subscribers and licenses.'}
+              {isAr ? 'الطبقة الثانية: الرجاء إدخال رمز المطور السري لإدارة المشتركين والاشتراكات سحابياً.' : 'Layer 2: Enter developer secret to manage subscribers and licenses.'}
             </p>
           </div>
           
@@ -391,209 +535,299 @@ export const Admin = () => {
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
-          <div className="p-3 bg-purple-500/10 text-[var(--color-primary)] rounded-xl">
-            <Users size={24} />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500">{isAr ? 'إجمالي المشتركين' : 'Total Subscribers'}</p>
-            <h4 className="text-2xl font-extrabold mt-0.5">{totalSubscribers}</h4>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
-          <div className="p-3 bg-green-500/10 text-green-500 rounded-xl">
-            <UserCheck size={24} />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500">{isAr ? 'المشتركين النشطين' : 'Active Licenses'}</p>
-            <h4 className="text-2xl font-extrabold mt-0.5">{activeSubscribers}</h4>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
-          <div className="p-3 bg-red-500/10 text-red-500 rounded-xl">
-            <Ban size={24} />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500">{isAr ? 'الاشتراكات المنتهية' : 'Expired Licenses'}</p>
-            <h4 className="text-2xl font-extrabold mt-0.5">{expiredSubscribers}</h4>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
-          <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl">
-            <Laptop size={24} />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500">{isAr ? 'الأجهزة المفعلة' : 'Activated Devices'}</p>
-            <h4 className="text-2xl font-extrabold mt-0.5">{activatedDevices}</h4>
-          </div>
-        </div>
+      {/* Tabs UI */}
+      <div className="flex border-b border-black/10 dark:border-white/10 mb-4">
+        <button
+          onClick={() => setActiveTab('licenses')}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+            activeTab === 'licenses'
+              ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          {isAr ? 'التراخيص النشطة' : 'Active Licenses'}
+        </button>
+        <button
+          onClick={() => { setActiveTab('requests'); fetchRequestsList(); }}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors relative ${
+            activeTab === 'requests'
+              ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          {isAr ? 'طلبات التفعيل' : 'Activation Requests'}
+          {pendingRequests.length > 0 && (
+            <span className="absolute top-1.5 left-2 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
+              {pendingRequests.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Control Bar - Search & Filter */}
-      <div className="bg-white dark:bg-[#1f2028] p-4 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <input 
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-sm"
-            placeholder={isAr ? '🔍 ابحث باسم التاجر أو كود التفعيل...' : '🔍 Search by merchant or license key...'}
-          />
-        </div>
+      {activeTab === 'licenses' && (
+        <>
+          {/* Stats Overview */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
+              <div className="p-3 bg-purple-500/10 text-[var(--color-primary)] rounded-xl">
+                <Users size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">{isAr ? 'إجمالي المشتركين' : 'Total Subscribers'}</p>
+                <h4 className="text-2xl font-extrabold mt-0.5">{totalSubscribers}</h4>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs opacity-60 hidden sm:inline">{isAr ? 'تصفية الحالة:' : 'Filter Status:'}</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full sm:w-auto p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none text-sm cursor-pointer"
-          >
-            <option value="all">{isAr ? 'جميع الحالات' : 'All Statuses'}</option>
-            <option value="active">{isAr ? 'نشط فقط' : 'Active Only'}</option>
-            <option value="expired">{isAr ? 'منتهي الصلاحية فقط' : 'Expired Only'}</option>
-            <option value="suspended">{isAr ? 'موقوف مؤقتاً' : 'Suspended'}</option>
-            <option value="disabled">{isAr ? 'ملغى' : 'Disabled'}</option>
-          </select>
-        </div>
-      </div>
+            <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
+              <div className="p-3 bg-green-500/10 text-green-500 rounded-xl">
+                <UserCheck size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">{isAr ? 'المشتركين النشطين' : 'Active Licenses'}</p>
+                <h4 className="text-2xl font-extrabold mt-0.5">{activeSubscribers}</h4>
+              </div>
+            </div>
 
-      {/* List of existing licenses */}
-      <div className="bg-white dark:bg-[#1f2028] p-6 rounded-2xl shadow-sm border border-black/10 dark:border-white/10">
-        {filteredLicenses.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-black/10 dark:border-white/10 rounded-2xl space-y-4">
-            <Laptop className="mx-auto text-gray-300 dark:text-gray-600 animate-pulse animate-duration-1000" size={60} />
-            <div className="max-w-xs mx-auto">
-              <p className="text-sm font-semibold opacity-70">
-                {isAr ? 'لم يتم العثور على أي مشتركين' : 'No Subscribers Found'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {isAr ? 'اضغط على زر تحديث البيانات لجلب المشتركين السحابيين أو قم بإضافة مشترك جديد.' : 'Try refreshing the data or add a new merchant license.'}
-              </p>
+            <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
+              <div className="p-3 bg-red-500/10 text-red-500 rounded-xl">
+                <Ban size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">{isAr ? 'الاشتراكات المنتهية' : 'Expired Licenses'}</p>
+                <h4 className="text-2xl font-extrabold mt-0.5">{expiredSubscribers}</h4>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#1f2028] p-5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex items-center gap-4 transition-all hover:-translate-y-0.5 duration-200">
+              <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl">
+                <Laptop size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500">{isAr ? 'الأجهزة المفعلة' : 'Activated Devices'}</p>
+                <h4 className="text-2xl font-extrabold mt-0.5">{activatedDevices}</h4>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right dir-auto">
-              <thead>
-                <tr className="border-b border-black/10 dark:border-white/10 text-gray-500 font-bold">
-                  <th className="px-4 py-3 pb-4 text-right">{isAr ? 'التاجر / المحل' : 'Merchant'}</th>
-                  <th className="px-4 py-3 pb-4 text-right">{isAr ? 'كود التفعيل' : 'License Key'}</th>
-                  <th className="px-4 py-3 pb-4 text-right">{isAr ? 'تاريخ الانتهاء' : 'Expiry Date'}</th>
-                  <th className="px-4 py-3 pb-4 text-right">{isAr ? 'الأجهزة' : 'Devices'}</th>
-                  <th className="px-4 py-3 pb-4 text-center">{isAr ? 'الحالة' : 'Status'}</th>
-                  <th className="px-4 py-3 pb-4 text-center">{isAr ? 'إجراءات التحكم' : 'Actions'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                {filteredLicenses.map(([key, value]: [string, any]) => {
-                  const expiry = new Date(value.expiry_date);
-                  const isExpired = new Date() > expiry;
-                  const activeCount = value.activated_devices ? value.activated_devices.length : 0;
-                  const maxDev = value.max_devices || 1;
 
-                  return (
-                    <tr key={key} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
-                      <td className="px-4 py-4.5 font-bold text-base text-[var(--color-primary)]">
-                        {value.merchant_name || '---'}
-                      </td>
-                      
-                      <td className="px-4 py-4.5">
-                        <div className="flex items-center gap-2 font-mono text-xs">
-                          <span className="bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-lg text-gray-700 dark:text-gray-300 font-semibold border border-black/5 dark:border-white/5 select-all">
-                            {key}
-                          </span>
-                          <button
-                            onClick={() => copyToClipboard(key)}
-                            className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg active:scale-95 transition-all text-gray-500 cursor-pointer"
-                            title={isAr ? 'نسخ الكود' : 'Copy Key'}
-                          >
-                            <Copy size={14} />
-                          </button>
-                        </div>
-                      </td>
+          {/* Control Bar - Search & Filter */}
+          <div className="bg-white dark:bg-[#1f2028] p-4 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex flex-col sm:flex-row gap-3 items-center justify-between mb-6">
+            <div className="relative w-full sm:w-80">
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-sm"
+                placeholder={isAr ? '🔍 ابحث باسم التاجر أو كود التفعيل...' : '🔍 Search by merchant or license key...'}
+              />
+            </div>
 
-                      <td className="px-4 py-4.5">
-                        <div className="flex flex-col">
-                          <span className={`font-semibold ${isExpired ? 'text-red-500 font-bold' : 'text-gray-700 dark:text-gray-300'}`}>
-                            {expiry.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </span>
-                          {isExpired && (
-                            <span className="text-[10px] text-red-500 font-bold bg-red-500/10 px-1.5 py-0.5 rounded w-fit mt-0.5">
-                              {isAr ? '🚨 منتهي الصلاحية' : '🚨 Expired'}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4.5">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1 text-xs font-semibold">
-                            <Smartphone size={14} className="opacity-60" />
-                            <span>{activeCount} / {maxDev === 0 ? '∞' : maxDev} أجهزة</span>
-                          </div>
-                          {activeCount > 0 && (
-                            <button
-                              onClick={() => handleClearDevices(key)}
-                              className="text-[11px] text-red-500 font-medium hover:underline text-right cursor-pointer"
-                            >
-                              ♻️ مسح الأجهزة
-                            </button>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4.5 text-center">
-                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${
-                          value.status === 'active' && !isExpired
-                            ? 'bg-green-500/10 text-green-600 border-green-500/10' 
-                            : value.status === 'suspended'
-                            ? 'bg-amber-500/10 text-amber-600 border-amber-500/10'
-                            : 'bg-red-500/10 text-red-600 border-red-500/10'
-                        }`}>
-                          {value.status === 'active' && !isExpired && (isAr ? 'نشط' : 'Active')}
-                          {value.status === 'active' && isExpired && (isAr ? 'منتهي' : 'Expired')}
-                          {value.status === 'suspended' && (isAr ? 'موقوف مؤقتاً' : 'Suspended')}
-                          {value.status === 'disabled' && (isAr ? 'ملغى' : 'Disabled')}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4.5 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => openEditModal(key, value)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-primary)] text-white text-xs font-bold rounded-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm"
-                          >
-                            <Edit2 size={12} />
-                            {isAr ? 'تعديل وتمديد' : 'Edit / Extend'}
-                          </button>
-
-                          <button
-                            onClick={() => shareViaWhatsApp({
-                              key: key,
-                              merchantName: value.merchant_name,
-                              expiryDate: value.expiry_date,
-                              maxDevices: value.max_devices
-                            })}
-                            className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all cursor-pointer"
-                            title={isAr ? 'إرسال ترخيص عبر الواتساب' : 'Share via WhatsApp'}
-                          >
-                            <Share2 size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs opacity-60 hidden sm:inline">{isAr ? 'تصفية الحالة:' : 'Filter Status:'}</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full sm:w-auto p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none text-sm cursor-pointer"
+              >
+                <option value="all">{isAr ? 'جميع الحالات' : 'All Statuses'}</option>
+                <option value="active">{isAr ? 'نشط فقط' : 'Active Only'}</option>
+                <option value="expired">{isAr ? 'منتهي الصلاحية فقط' : 'Expired Only'}</option>
+                <option value="suspended">{isAr ? 'موقوف مؤقتاً' : 'Suspended'}</option>
+                <option value="disabled">{isAr ? 'ملغى' : 'Disabled'}</option>
+              </select>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* List of existing licenses */}
+          <div className="bg-white dark:bg-[#1f2028] p-6 rounded-2xl shadow-sm border border-black/10 dark:border-white/10">
+            {filteredLicenses.length === 0 ? (
+              <div className="text-center py-20 border border-dashed border-black/10 dark:border-white/10 rounded-2xl space-y-4">
+                <Laptop className="mx-auto text-gray-300 dark:text-gray-600 animate-pulse animate-duration-1000" size={60} />
+                <div className="max-w-xs mx-auto">
+                  <p className="text-sm font-semibold opacity-70">
+                    {isAr ? 'لم يتم العثور على أي مشتركين' : 'No Subscribers Found'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {isAr ? 'اضغط على زر تحديث البيانات لجلب المشتركين السحابيين أو قم بإضافة مشترك جديد.' : 'Try refreshing the data or add a new merchant license.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-right dir-auto">
+                  <thead>
+                    <tr className="border-b border-black/10 dark:border-white/10 text-gray-500 font-bold">
+                      <th className="px-4 py-3 pb-4 text-right">{isAr ? 'التاجر / المحل' : 'Merchant'}</th>
+                      <th className="px-4 py-3 pb-4 text-right">{isAr ? 'كود التفعيل' : 'License Key'}</th>
+                      <th className="px-4 py-3 pb-4 text-right">{isAr ? 'تاريخ الانتهاء' : 'Expiry Date'}</th>
+                      <th className="px-4 py-3 pb-4 text-right">{isAr ? 'الأجهزة' : 'Devices'}</th>
+                      <th className="px-4 py-3 pb-4 text-center">{isAr ? 'الحالة' : 'Status'}</th>
+                      <th className="px-4 py-3 pb-4 text-center">{isAr ? 'إجراءات التحكم' : 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                    {filteredLicenses.map(([key, value]: [string, any]) => {
+                      const expiry = new Date(value.expiry_date);
+                      const isExpired = new Date() > expiry;
+                      const activeCount = value.activated_devices ? value.activated_devices.length : 0;
+                      const maxDev = value.max_devices || 1;
+
+                      return (
+                        <tr key={key} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+                          <td className="px-4 py-4.5 font-bold text-base text-[var(--color-primary)]">
+                            {value.merchant_name || '---'}
+                          </td>
+                          
+                          <td className="px-4 py-4.5">
+                            <div className="flex items-center gap-2 font-mono text-xs">
+                              <span className="bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-lg text-gray-700 dark:text-gray-300 font-semibold border border-black/5 dark:border-white/5 select-all">
+                                {key}
+                              </span>
+                              <button
+                                onClick={() => copyToClipboard(key)}
+                                className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg active:scale-95 transition-all text-gray-500 cursor-pointer"
+                                title={isAr ? 'نسخ الكود' : 'Copy Key'}
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4.5">
+                            <div className="flex flex-col">
+                              <span className={`font-semibold ${isExpired ? 'text-red-500 font-bold' : 'text-gray-700 dark:text-gray-300'}`}>
+                                {expiry.toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </span>
+                              {isExpired && (
+                                <span className="text-[10px] text-red-500 font-bold bg-red-500/10 px-1.5 py-0.5 rounded w-fit mt-0.5">
+                                  {isAr ? '🚨 منتهي الصلاحية' : '🚨 Expired'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4.5">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1 text-xs font-semibold">
+                                <Smartphone size={14} className="opacity-60" />
+                                <span>{activeCount} / {maxDev === 0 ? '∞' : maxDev} أجهزة</span>
+                              </div>
+                              {activeCount > 0 && (
+                                <button
+                                  onClick={() => handleClearDevices(key)}
+                                  className="text-[11px] text-red-500 font-medium hover:underline text-right cursor-pointer"
+                                >
+                                  ♻️ مسح الأجهزة
+                                </button>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-4.5 text-center">
+                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${
+                              value.status === 'active' && !isExpired
+                                ? 'bg-green-500/10 text-green-600 border-green-500/10' 
+                                : value.status === 'suspended'
+                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/10'
+                                : 'bg-red-500/10 text-red-600 border-red-500/10'
+                            }`}>
+                              {value.status === 'active' && !isExpired && (isAr ? 'نشط' : 'Active')}
+                              {value.status === 'active' && isExpired && (isAr ? 'منتهي' : 'Expired')}
+                              {value.status === 'suspended' && (isAr ? 'موقوف مؤقتاً' : 'Suspended')}
+                              {value.status === 'disabled' && (isAr ? 'ملغى' : 'Disabled')}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-4.5 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => openEditModal(key, value)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-primary)] text-white text-xs font-bold rounded-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm"
+                              >
+                                <Edit2 size={12} />
+                                {isAr ? 'تعديل وتمديد' : 'Edit / Extend'}
+                              </button>
+
+                              <button
+                                onClick={() => shareViaWhatsApp({
+                                  key: key,
+                                  merchantName: value.merchant_name,
+                                  expiryDate: value.expiry_date,
+                                  maxDevices: value.max_devices
+                                })}
+                                className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all cursor-pointer"
+                                title={isAr ? 'إرسال ترخيص عبر الواتساب' : 'Share via WhatsApp'}
+                              >
+                                <Share2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Requests Tab */}
+      {activeTab === 'requests' && (
+        <div className="bg-white dark:bg-[#1f2028] p-6 rounded-2xl shadow-sm border border-black/10 dark:border-white/10">
+          <h3 className="text-lg font-bold mb-4">{isAr ? 'طلبات التفعيل والتمديد' : 'Activation Requests'}</h3>
+          
+          {pendingRequests.length === 0 ? (
+            <div className="text-center py-20 border border-dashed border-black/10 dark:border-white/10 rounded-2xl space-y-4">
+              <ShieldCheck className="mx-auto text-gray-300 dark:text-gray-600" size={60} />
+              <p className="text-sm font-semibold opacity-70">
+                {isAr ? 'لا توجد طلبات معلقة حالياً' : 'No pending requests'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {pendingRequests.map(req => (
+                <div key={req.id} className="p-4 rounded-xl border border-black/10 dark:border-white/10 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-[var(--color-primary)] text-lg mb-1">{req.merchant_name}</h4>
+                    <div className="text-xs text-gray-500 flex flex-wrap gap-4 mt-1">
+                      <span>{isAr ? 'المدة المطلوبة:' : 'Requested Duration:'} <strong className="text-gray-700 dark:text-gray-300">{req.duration_months} {isAr ? 'أشهر' : 'months'}</strong></span>
+                      {req.phone && <span>{isAr ? 'الهاتف:' : 'Phone:'} <strong className="text-gray-700 dark:text-gray-300" dir="ltr">{req.phone}</strong></span>}
+                      <span>{isAr ? 'تاريخ الطلب:' : 'Date:'} {new Date(req.timestamp).toLocaleDateString()}</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-400 mt-2">
+                      ID: {req.hardware_fingerprint}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {req.status === 'approved' ? (
+                      <span className="px-4 py-2 bg-green-500/10 text-green-600 rounded-xl font-bold text-sm">
+                        {isAr ? 'تمت الموافقة ✓' : 'Approved ✓'}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleRejectRequest(req.id)}
+                          className="px-4 py-2 border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded-xl transition-all text-sm font-bold cursor-pointer"
+                        >
+                          {isAr ? 'رفض الطلب' : 'Reject'}
+                        </button>
+                        <button
+                          onClick={() => handleApproveRequest(req)}
+                          className="px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-xl transition-all text-sm font-bold flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-500/20"
+                        >
+                          <CheckCircle size={16} />
+                          {isAr ? 'موافقة وتوليد مفتاح' : 'Approve & Generate'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* MODAL 1: ADD SUBSCRIBER */}
       {showAddModal && (

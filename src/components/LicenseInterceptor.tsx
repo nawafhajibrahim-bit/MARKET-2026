@@ -12,7 +12,8 @@ const OWNER_WHATSAPP_URL = 'https://wa.me/9647510171376';
 
 export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const db = useDb();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language.startsWith('ar');
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(true);
@@ -413,8 +414,9 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg)] text-[var(--text)] p-4 text-center">
               <div className="bg-white dark:bg-[#1f2028] p-8 rounded-2xl border border-red-500/30 max-w-md w-full shadow-lg space-y-6 animate-in fade-in duration-300">
-                 <div className="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center">
-                     <Lock size={32} className="text-red-500" />
+                 <div className="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center relative cursor-pointer group" onClick={() => window.location.href = '/owner-portal'} title={isAr ? 'دخول المالك' : 'Owner Login'}>
+                     <Lock size={32} className="text-red-500 group-hover:scale-110 transition-transform" />
+                     <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-[#1f2028]"></div>
                  </div>
                  <h1 className="text-2xl font-bold text-red-500">{t('license_required') || 'تفعيل البرنامج مطلوب'}</h1>
                  <p className="text-sm opacity-80 leading-relaxed">
