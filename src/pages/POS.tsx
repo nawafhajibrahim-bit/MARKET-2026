@@ -663,28 +663,27 @@ export const POS = () => {
                         const activeUnit = item.selectedUnit ? item.selectedUnit.unit_name.toLowerCase() : (item.product.unit || 'piece').toLowerCase();
                         let shortcuts: { label: string, value: number, isAdd?: boolean }[] = [];
 
+                        const parseShortcuts = (storageKey: string, defaultVals: string, isAdd: boolean) => {
+                          const str = localStorage.getItem(storageKey) || defaultVals;
+                          return str.split(',').map(s => {
+                            const val = parseFloat(s.trim().replace('+', ''));
+                            if (isNaN(val)) return null;
+                            const label = s.trim();
+                            return { label, value: val, isAdd: label.startsWith('+') || isAdd };
+                          }).filter(Boolean) as { label: string, value: number, isAdd?: boolean }[];
+                        };
+
                         if (activeUnit === 'g' || activeUnit.includes('gram') || activeUnit.includes('غرام')) {
-                          shortcuts = [
-                            { label: '50g', value: 50 },
-                            { label: '100g', value: 100 },
-                            { label: '250g', value: 250 },
-                            { label: '500g', value: 500 },
-                          ];
+                          shortcuts = parseShortcuts('pos_shortcuts_g', '50g, 100g, 250g, 500g', false);
                         } else if (activeUnit === 'kg' || activeUnit.includes('kilo') || activeUnit.includes('كيلو')) {
-                          shortcuts = [
-                            { label: '¼', value: 0.25 },
-                            { label: '½', value: 0.5 },
-                            { label: '1', value: 1 },
-                            { label: '2', value: 2 },
-                            { label: '5', value: 5 },
-                          ];
+                          shortcuts = parseShortcuts('pos_shortcuts_kg', '¼, ½, 1, 2, 5', false).map(sc => {
+                            // Map special fractions back to their numeric values if user kept defaults
+                            if (sc.label === '¼') return { ...sc, value: 0.25 };
+                            if (sc.label === '½') return { ...sc, value: 0.5 };
+                            return sc;
+                          });
                         } else {
-                          shortcuts = [
-                            { label: '+2', value: 2, isAdd: true },
-                            { label: '+5', value: 5, isAdd: true },
-                            { label: '+10', value: 10, isAdd: true },
-                            { label: '+12', value: 12, isAdd: true },
-                          ];
+                          shortcuts = parseShortcuts('pos_shortcuts_piece', '+2, +5, +10, +12', true);
                         }
 
                         return (
