@@ -6,11 +6,12 @@ type ApiRequest = {
     method?: string;
     body: {
         admin_secret?: string;
-        action?: 'save' | 'list' | 'clear-devices';
+        action?: 'save' | 'list' | 'clear-devices' | 'delete';
         license_key?: string;
         expiry_date?: string;
         status?: string;
         merchant_name?: string;
+        phone?: string;
         max_devices?: number;
         timestamp?: string;
     };
@@ -40,6 +41,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         expiry_date, 
         status, 
         merchant_name, 
+        phone,
         max_devices, 
         timestamp 
     } = req.body;
@@ -110,6 +112,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const existingRecord: any = (await kv.get(`license:${license_key}`)) || {};
             const updatedRecord = {
                 merchant_name: merchant_name || existingRecord.merchant_name || '',
+                phone: phone || existingRecord.phone || '',
                 expiry_date: expiry_date,
                 status: status,
                 max_devices: typeof max_devices === 'number' ? max_devices : (existingRecord.max_devices || 1),
@@ -118,6 +121,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
             await kv.set(`license:${license_key}`, updatedRecord);
             return res.status(200).json({ success: true, message: 'License updated successfully' });
+        }
+
+        // 4. Delete action
+        if (action === 'delete') {
+            if (!license_key) {
+                return res.status(400).json({ error: 'Missing license key' });
+            }
+            await kv.del(`license:${license_key}`);
+            return res.status(200).json({ success: true, message: 'License deleted successfully' });
         }
 
         return res.status(400).json({ error: 'Invalid action' });

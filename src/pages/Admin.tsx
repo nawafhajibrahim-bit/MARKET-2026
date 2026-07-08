@@ -13,7 +13,8 @@ import {
   X, 
   Users,
   Ban,
-  UserCheck
+  UserCheck,
+  Trash2
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -29,6 +30,7 @@ export const Admin = () => {
   const [adminSecret, setAdminSecret] = useState(() => localStorage.getItem('sm_developer_secret') || '');
   const [tempSecretInput, setTempSecretInput] = useState('');
   const [merchantName, setMerchantName] = useState('');
+  const [merchantPhone, setMerchantPhone] = useState('');
   const [durationMonths, setDurationMonths] = useState(12);
   const [maxDevices, setMaxDevices] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -51,6 +53,7 @@ export const Admin = () => {
   // Editing License State
   const [editingLicenseKey, setEditingLicenseKey] = useState<string | null>(null);
   const [editMerchantName, setEditMerchantName] = useState('');
+  const [editMerchantPhone, setEditMerchantPhone] = useState('');
   const [editStatus, setEditStatus] = useState('active');
   const [editMaxDevices, setEditMaxDevices] = useState(1);
   const [editExpiryDate, setEditExpiryDate] = useState('');
@@ -89,6 +92,7 @@ export const Admin = () => {
           expiry_date: expiryDate.toISOString(),
           status: 'active',
           merchant_name: merchantName,
+          phone: merchantPhone,
           max_devices: Number(maxDevices)
         })
       });
@@ -107,6 +111,7 @@ export const Admin = () => {
         
         // Reset states
         setMerchantName('');
+        setMerchantPhone('');
         setShowAddModal(false);
         setShowSuccessModal(true);
         
@@ -190,6 +195,7 @@ export const Admin = () => {
       
       // 2. Pre-fill modal
       setMerchantName(request.merchant_name);
+      setMerchantPhone(request.phone || '');
       setDurationMonths(request.duration_months);
       setMaxDevices(1);
       
@@ -223,9 +229,11 @@ export const Admin = () => {
     }
   };
 
-  const openEditModal = (key: string, license: any) => {
+  const openEditModal = (key: string) => {
+    const license = licensesList[key];
     setEditingLicenseKey(key);
     setEditMerchantName(license.merchant_name || '');
+    setEditMerchantPhone(license.phone || '');
     setEditStatus(license.status || 'active');
     setEditMaxDevices(license.max_devices || 1);
     
@@ -258,6 +266,7 @@ export const Admin = () => {
           expiry_date: expiryIso,
           status: editStatus,
           merchant_name: editMerchantName,
+          phone: editMerchantPhone,
           max_devices: Number(editMaxDevices),
           timestamp: new Date().toISOString()
         })
@@ -272,7 +281,38 @@ export const Admin = () => {
       }
     } catch (err) {
       console.error(err);
-      alert('Network error');
+      alert('Network error, action failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteLicense = async (key: string) => {
+    if (!window.confirm(isAr ? 'هل أنت متأكد من حذف هذا الترخيص نهائياً؟' : 'Are you sure you want to delete this license?')) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const res = await fetch('/api/manage-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_secret: adminSecret,
+          timestamp: new Date().toISOString(),
+          action: 'delete',
+          license_key: key
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        fetchLicensesList();
+      } else {
+        alert(data.error || 'Failed to delete license');
+      }
+    } catch {
+      alert('Network error, action failed');
     } finally {
       setLoading(false);
     }
@@ -685,7 +725,16 @@ export const Admin = () => {
                       return (
                         <tr key={key} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
                           <td className="px-4 py-4.5 font-bold text-base text-[var(--color-primary)]">
-                            {value.merchant_name || '---'}
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {value.merchant_name || '---'}
+                              </span>
+                              {value.phone && (
+                                <span className="text-xs text-gray-500 font-mono mt-0.5" dir="ltr">
+                                  {value.phone}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           
                           <td className="px-4 py-4.5">
@@ -751,13 +800,12 @@ export const Admin = () => {
                           <td className="px-4 py-4.5 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <button
-                                onClick={() => openEditModal(key, value)}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-primary)] text-white text-xs font-bold rounded-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm"
+                                onClick={() => openEditModal(key)}
+                                className="p-1.5 bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white rounded-lg transition-all cursor-pointer"
+                                title={isAr ? 'تعديل وتمديد' : 'Edit & Extend'}
                               >
-                                <Edit2 size={12} />
-                                {isAr ? 'تعديل وتمديد' : 'Edit / Extend'}
+                                <Edit2 size={16} />
                               </button>
-
                               <button
                                 onClick={() => shareViaWhatsApp({
                                   key: key,
@@ -765,10 +813,17 @@ export const Admin = () => {
                                   expiryDate: value.expiry_date,
                                   maxDevices: value.max_devices
                                 })}
-                                className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 active:scale-95 transition-all cursor-pointer"
+                                className="p-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all cursor-pointer"
                                 title={isAr ? 'إرسال ترخيص عبر الواتساب' : 'Share via WhatsApp'}
                               >
-                                <Share2 size={12} />
+                                <Share2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLicense(key)}
+                                className="p-1.5 bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white rounded-lg transition-all cursor-pointer"
+                                title={isAr ? 'حذف' : 'Delete'}
+                              >
+                                <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
@@ -867,6 +922,17 @@ export const Admin = () => {
                   onChange={(e) => setMerchantName(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
                   placeholder={isAr ? 'مثال: سوبرماركت الهلال' : 'e.g. Al-Hilal Market'}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">{isAr ? 'رقم الهاتف (اختياري)' : 'Phone Number (Optional)'}</label>
+                <input 
+                  type="text"
+                  value={merchantPhone}
+                  onChange={(e) => setMerchantPhone(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                  placeholder="07xxxxxxx"
                 />
               </div>
 
