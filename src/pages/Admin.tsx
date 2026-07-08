@@ -27,6 +27,7 @@ export const Admin = () => {
   const [ownerPassword, setOwnerPassword] = useState('');
 
   const [adminSecret, setAdminSecret] = useState(() => localStorage.getItem('sm_developer_secret') || '');
+  const [tempSecretInput, setTempSecretInput] = useState('');
   const [merchantName, setMerchantName] = useState('');
   const [durationMonths, setDurationMonths] = useState(12);
   const [maxDevices, setMaxDevices] = useState(1);
@@ -121,8 +122,9 @@ export const Admin = () => {
     }
   };
 
-  async function fetchLicensesList() {
-    if (!adminSecret) {
+  async function fetchLicensesList(overrideSecret?: string) {
+    const secretToUse = overrideSecret || adminSecret;
+    if (!secretToUse) {
       alert(isAr ? 'يرجى إدخال رمز الأدمن أولاً لجلب التراخيص' : 'Please enter admin secret first');
       return;
     }
@@ -132,7 +134,7 @@ export const Admin = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          admin_secret: adminSecret,
+          admin_secret: secretToUse,
           action: 'list',
           timestamp: new Date().toISOString()
         })
@@ -152,14 +154,15 @@ export const Admin = () => {
     }
   }
 
-  async function fetchRequestsList() {
-    if (!adminSecret) return;
+  async function fetchRequestsList(overrideSecret?: string) {
+    const secretToUse = overrideSecret || adminSecret;
+    if (!secretToUse) return;
     try {
       const res = await fetch('/api/license-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          admin_secret: adminSecret,
+          admin_secret: secretToUse,
           action: 'list'
         })
       });
@@ -455,13 +458,21 @@ export const Admin = () => {
             </p>
           </div>
           
-          <form onSubmit={(e) => { e.preventDefault(); fetchLicensesList(); }} className="space-y-4">
+          <form onSubmit={(e) => { 
+            e.preventDefault(); 
+            if (tempSecretInput) {
+              setAdminSecret(tempSecretInput);
+              localStorage.setItem('sm_developer_secret', tempSecretInput);
+              fetchLicensesList(tempSecretInput);
+              fetchRequestsList(tempSecretInput);
+            }
+          }} className="space-y-4">
             <div className="relative">
               <input 
                 type="password"
                 required
-                value={adminSecret}
-                onChange={(e) => setAdminSecret(e.target.value)}
+                value={tempSecretInput}
+                onChange={(e) => setTempSecretInput(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-center font-mono font-bold tracking-wider"
                 placeholder={isAr ? 'أدخل الرمز السري' : 'Enter Admin Secret'}
               />
@@ -503,7 +514,7 @@ export const Admin = () => {
         
         <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
-            onClick={fetchLicensesList}
+            onClick={() => fetchLicensesList()}
             disabled={listLoading}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 border border-black/10 dark:border-white/10 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 transition-all text-sm font-semibold disabled:opacity-50 cursor-pointer"
           >
