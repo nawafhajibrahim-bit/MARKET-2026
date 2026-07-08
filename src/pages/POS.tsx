@@ -657,6 +657,57 @@ export const POS = () => {
                           <span className="text-xs text-gray-400">{baseUnitLabel}</span>
                         );
                       })()}
+                      
+                      {/* Quick Quantity Shortcuts */}
+                      {(() => {
+                        const activeUnit = item.selectedUnit ? item.selectedUnit.unit_name.toLowerCase() : (item.product.unit || 'piece').toLowerCase();
+                        let shortcuts: { label: string, value: number, isAdd?: boolean }[] = [];
+
+                        if (activeUnit === 'g' || activeUnit.includes('gram') || activeUnit.includes('غرام')) {
+                          shortcuts = [
+                            { label: '50g', value: 50 },
+                            { label: '100g', value: 100 },
+                            { label: '250g', value: 250 },
+                            { label: '500g', value: 500 },
+                          ];
+                        } else if (activeUnit === 'kg' || activeUnit.includes('kilo') || activeUnit.includes('كيلو')) {
+                          shortcuts = [
+                            { label: '¼', value: 0.25 },
+                            { label: '½', value: 0.5 },
+                            { label: '1', value: 1 },
+                            { label: '2', value: 2 },
+                            { label: '5', value: 5 },
+                          ];
+                        } else {
+                          shortcuts = [
+                            { label: '+2', value: 2, isAdd: true },
+                            { label: '+5', value: 5, isAdd: true },
+                            { label: '+10', value: 10, isAdd: true },
+                            { label: '+12', value: 12, isAdd: true },
+                          ];
+                        }
+
+                        return (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {shortcuts.map((sc, i) => (
+                              <button
+                                key={i}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (sc.isAdd) {
+                                    handleSetQuantity(index, item.quantity + sc.value);
+                                  } else {
+                                    handleSetQuantity(index, sc.value);
+                                  }
+                                }}
+                                className="px-2 py-0.5 text-[10px] font-bold bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white rounded transition-colors cursor-pointer"
+                              >
+                                {sc.label}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                     
                     <button 
