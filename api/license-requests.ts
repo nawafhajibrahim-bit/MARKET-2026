@@ -67,9 +67,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         // --- ADMIN ONLY ACTIONS BELOW ---
-        const ADMIN_SECRET = process.env.ADMIN_SECRET;
-        if (!ADMIN_SECRET || !admin_secret || !safeCompare(admin_secret, ADMIN_SECRET)) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        const ADMIN_SECRET = process.env.ADMIN_SECRET?.trim();
+        const provided_secret = admin_secret?.trim();
+
+        if (!ADMIN_SECRET) {
+            return res.status(500).json({ error: 'لم يتم العثور على المفتاح السري في إعدادات Vercel (ADMIN_SECRET). يرجى التأكد من إضافته وإعادة البناء.' });
+        }
+
+        if (!provided_secret || !safeCompare(provided_secret, ADMIN_SECRET)) {
+            return res.status(401).json({ error: 'الرمز السري الذي أدخلته غير صحيح.' });
         }
 
         // 2. List action (Admin - list all pending requests)
