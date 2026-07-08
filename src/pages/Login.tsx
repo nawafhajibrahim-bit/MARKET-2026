@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LogIn, User, Lock, Store, Zap, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useDb } from '../database/Provider';
 
 export const LoginScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -14,9 +15,31 @@ export const LoginScreen: React.FC = () => {
   const [selectedBranch, setSelectedBranch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const db = useDb();
+  const [isLicensed, setIsLicensed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!db) return;
+    const checkLicense = async () => {
+      try {
+        const configDoc = await db.system_config.findOne('config').exec();
+        if (configDoc) {
+          const config = configDoc.toJSON();
+          const licensed = config.activation_status === true && !!config.license_key;
+          setIsLicensed(licensed);
+          if (licensed) {
+            setShowAdvanced(true); // Always show the login form if licensed
+          }
+        }
+      } catch (err) {
+        console.error('Error checking license status in Login:', err);
+      }
+    };
+    checkLicense();
+  }, [db]);
 
   // Automatically select the first branch by default
-  React.useEffect(() => {
+  useEffect(() => {
     if (availableBranches.length > 0 && !selectedBranch) {
       setSelectedBranch(availableBranches[0].branch_id);
     }
@@ -79,42 +102,49 @@ export const LoginScreen: React.FC = () => {
           </div>
         )}
 
-        {/* Primary Actions for New Users */}
-        <div className="space-y-4 pt-2">
-          <button
-            onClick={handleQuickLogin}
-            disabled={loading}
-            className="w-full py-4 bg-[var(--color-primary)] text-white font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-lg shadow-lg shadow-[var(--color-primary)]/20 cursor-pointer"
-          >
-            <Zap size={24} />
-            {loading ? t('verifying') : (isAr ? 'الدخول السريع للتجربة' : 'Quick Trial Login')}
-          </button>
+        {/* Primary Actions for New Users (Only if NOT licensed) */}
+        {!isLicensed && (
+          <>
+            <div className="space-y-4 pt-2">
+              <button
+                onClick={handleQuickLogin}
+                disabled={loading}
+                className="w-full py-4 bg-[var(--color-primary)] text-white font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-lg shadow-lg shadow-[var(--color-primary)]/20 cursor-pointer"
+              >
+                <Zap size={24} />
+                {loading ? t('verifying') : (isAr ? 'الدخول السريع للتجربة' : 'Quick Trial Login')}
+              </button>
 
-          <button
-            onClick={handleRequestSubscription}
-            className="w-full py-3.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 cursor-pointer"
-          >
-            <MessageCircle size={22} />
-            {isAr ? 'طلب تفعيل أو اشتراك' : 'Request Subscription'}
-          </button>
-        </div>
+              <button
+                onClick={handleRequestSubscription}
+                className="w-full py-3.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 cursor-pointer"
+              >
+                <MessageCircle size={22} />
+                {isAr ? 'طلب تفعيل أو اشتراك' : 'Request Subscription'}
+              </button>
+            </div>
 
-        {/* Advanced Login Toggle */}
-        <div className="pt-6 border-t border-black/5 dark:border-white/5">
-          <button 
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-[var(--text)] transition-colors font-semibold cursor-pointer"
-          >
-            {isAr ? 'دخول متقدم / موظف' : 'Advanced / Employee Login'}
-            {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-        </div>
+            {/* Advanced Login Toggle */}
+            <div className="pt-6 border-t border-black/5 dark:border-white/5">
+              <button 
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-[var(--text)] transition-colors font-semibold cursor-pointer"
+              >
+                {isAr ? 'دخول متقدم / موظف' : 'Advanced / Employee Login'}
+                {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Advanced Login Form */}
         {showAdvanced && (
           <form onSubmit={handleAdvancedSubmit} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('username') || 'Username'}</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium">{t('username') || 'Username'}</label>
+                {isLicensed && <span className="text-[10px] text-gray-400">{isAr ? '(الافتراضي: admin)' : '(Default: admin)'}</span>}
+              </div>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
@@ -129,7 +159,10 @@ export const LoginScreen: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">{t('password') || 'Password'}</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-sm font-medium">{t('password') || 'Password'}</label>
+                {isLicensed && <span className="text-[10px] text-gray-400">{isAr ? '(الافتراضي: admin)' : '(Default: admin)'}</span>}
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
