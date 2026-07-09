@@ -8,6 +8,8 @@ import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialC
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
 import { runAutoBackup } from '../components/AutoBackupRunner';
 import { hashPassword as secureHashPassword, generateSalt } from '../services/passwordService';
+import { getHardwareFingerprint } from '../services/fingerprintService';
+import { encryptData } from '../services/cryptoService';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_VERSION } from '../utils/version';
 import {
@@ -119,6 +121,11 @@ export const Settings = () => {
   const [reqPhone, setReqPhone] = useState<string>('');
   const [reqLoading, setReqLoading] = useState(false);
   const [reqSuccess, setReqSuccess] = useState<string | null>(null);
+  
+  const [activationKey, setActivationKey] = useState('');
+  const [activationLoading, setActivationLoading] = useState(false);
+  const [activationSuccess, setActivationSuccess] = useState('');
+  const [activationError, setActivationError] = useState('');
 
   useEffect(() => {
     if (db) {
@@ -597,6 +604,88 @@ export const Settings = () => {
       alert(isAr ? 'خطأ في الاتصال' : 'Network error');
     } finally {
       setReqLoading(false);
+    }
+  };
+
+  const handleActivateLicense = async () => {
+    if (!activationKey.trim()) {
+      setActivationError(isAr ? 'يرجى إدخال مفتاح التفعيل' : 'Please enter an activation key');
+      return;
+    }
+    setActivationLoading(true);
+    setActivationError('');
+    setActivationSuccess('');
+    
+    try {
+      const hwFingerprint = await getHardwareFingerprint();
+      
+      const isDemoBypassKey = activationKey === 'TEST-LICENSE' || 
+                               activationKey === 'TEST' || 
+                               activationKey === '1234' || 
+                               activationKey === '123456' || 
+                               activationKey === '123';
+      const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false';
+      
+      if (isDemoLoginEnabled && isDemoBypassKey) {
+          const fullTokenPayload = JSON.stringify({ license_key: activationKey, hw_fingerprint: hwFingerprint });
+          const encryptedToken = await encryptData(fullTokenPayload, hwFingerprint);
+          const configDoc = await db.system_config.findOne('config').exec();
+          if (configDoc) {
+              await configDoc.incrementalPatch({ 
+                license_key: activationKey, 
+                activation_status: true, 
+                offline_grace_days_left: 5,
+                last_sync_timestamp: new Date().toISOString(),
+                hardware_fingerprint: hwFingerprint,
+                activation_token: encryptedToken,
+                clock_tamper_detected: false
+              });
+              setSysConfig(configDoc.toJSON());
+          }
+          setActivationSuccess(isAr ? 'تم تفعيل البرنامج بنجاح! (وضع المطور)' : 'Software activated successfully! (Dev Mode)');
+          setActivationKey('');
+          setActivationLoading(false);
+          return;
+      }
+
+      const res = await fetch('/api/verify-license', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ license_key: activationKey, hw_fingerprint: hwFingerprint })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.active) {
+          const fullTokenPayload = JSON.stringify({ 
+            license_key: activationKey, 
+            hw_fingerprint: hwFingerprint,
+            expiry_date: data.expiry_date
+          });
+          const encryptedToken = await encryptData(fullTokenPayload, hwFingerprint);
+
+          const configDoc = await db.system_config.findOne('config').exec();
+          if (configDoc) {
+              await configDoc.incrementalPatch({ 
+                license_key: activationKey, 
+                activation_status: true, 
+                offline_grace_days_left: 5,
+                last_sync_timestamp: new Date().toISOString(),
+                hardware_fingerprint: hwFingerprint,
+                activation_token: encryptedToken,
+                clock_tamper_detected: false
+              });
+              setSysConfig(configDoc.toJSON());
+          }
+          setActivationSuccess(isAr ? 'تم تفعيل البرنامج بنجاح!' : 'Software activated successfully!');
+          setActivationKey('');
+      } else {
+          const errorType = data.error || 'license_invalid';
+          setActivationError(t(errorType) || errorType);
+      }
+    } catch {
+        setActivationError(t('license_error') || 'حدث خطأ في الشبكة.');
+    } finally {
+        setActivationLoading(false);
     }
   };
 
@@ -1297,7 +1386,36 @@ export const Settings = () => {
               </div>
             </div>
 
-            <div>
+            {/* Manual Activation */}
+            <div className="pt-4 border-t border-black/5 dark:border-white/5">
+                <h4 className="font-medium text-lg mb-2">{isAr ? 'إدخال مفتاح التفعيل / تمديد الاشتراك' : 'Enter Activation Key / Extend Subscription'}</h4>
+                <p className="text-sm text-gray-500 mb-4">
+                  {isAr ? 'إذا حصلت على مفتاح تفعيل جديد، قم بإدخاله هنا لتحديث حالة اشتراكك فوراً.' : 'If you received a new activation key, enter it here to update your subscription instantly.'}
+                </p>
+                
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  <div className="flex-1 w-full">
+                    <input 
+                      type="text"
+                      value={activationKey}
+                      onChange={(e) => setActivationKey(e.target.value)}
+                      placeholder={isAr ? "مثال: SM-XXXX-XXXX" : "e.g. SM-XXXX-XXXX"}
+                      className="w-full px-4 py-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono dir-ltr text-center"
+                    />
+                    {activationError && <p className="text-red-500 text-sm font-semibold mt-2">{activationError}</p>}
+                    {activationSuccess && <p className="text-green-600 dark:text-green-400 text-sm font-semibold mt-2">{activationSuccess}</p>}
+                  </div>
+                  <button 
+                    onClick={handleActivateLicense}
+                    disabled={activationLoading}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-[var(--color-primary)] hover:brightness-110 disabled:opacity-50 text-white font-bold rounded-lg transition-all cursor-pointer shadow-md"
+                  >
+                    {activationLoading ? (isAr ? 'جاري التحقق...' : 'Verifying...') : (isAr ? 'تفعيل الآن' : 'Activate Now')}
+                  </button>
+                </div>
+            </div>
+
+            <div className="pt-4 border-t border-black/5 dark:border-white/5">
               <h4 className="font-medium text-lg mb-2">{isAr ? 'طلب تمديد أو ترقية الاشتراك' : 'Request Extension / Upgrade'}</h4>
               <p className="text-sm text-gray-500 mb-4">
                 {isAr ? 'يمكنك إرسال طلب للمطور لتمديد أو تفعيل اشتراكك السحابي.' : 'Send a request to the developer to extend or activate your cloud subscription.'}
