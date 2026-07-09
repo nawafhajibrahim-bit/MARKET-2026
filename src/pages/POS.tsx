@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle, Camera } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList, getPOSHelperCurrency, setPOSHelperCurrency } from '../utils/currency';
 import { Receipt } from '../components/Receipt';
 import { useCart } from '../hooks/useCart';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { CameraScannerModal } from '../components/CameraScannerModal';
 
 interface CartItem {
   product: ProductDocType;
@@ -32,6 +33,7 @@ export const POS = () => {
   const [unitsMap, setUnitsMap] = useState<Record<string, UnitDocType[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
 
   // Debounce search term
   useEffect(() => {
@@ -511,13 +513,13 @@ export const POS = () => {
 
       {/* Products Selection Area */}
       <div className="flex-1 flex flex-col gap-4 bg-white/50 dark:bg-[#16171d]/50 rounded-xl p-4 border border-black/5 dark:border-white/5 overflow-hidden">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+        <div className="relative flex items-center">
+          <Search className="absolute left-4 text-gray-400 pointer-events-none" size={20} />
           <input 
             ref={searchInputRef}
             type="text" 
             placeholder={t('search_barcode')}
-            className="w-full pl-12 pr-4 py-4 rounded-xl text-lg bg-white dark:bg-[#1f2028] shadow-sm border-2 border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
+            className="w-full pl-12 pr-12 py-4 rounded-xl text-lg bg-white dark:bg-[#1f2028] shadow-sm border-2 border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
             autoFocus
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -548,6 +550,13 @@ export const POS = () => {
               }
             }}
           />
+          <button 
+            onClick={() => setShowCameraScanner(true)}
+            className="absolute right-4 p-2 text-gray-400 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 rounded-lg transition-colors cursor-pointer"
+            title={isAr ? "مسح بالكاميرا" : "Scan with camera"}
+          >
+            <Camera size={24} />
+          </button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-2 mt-2">
@@ -796,6 +805,25 @@ export const POS = () => {
           </div>
         </div>
       </div>
+
+      {showCameraScanner && (
+        <CameraScannerModal 
+          onScan={(barcode) => {
+            const match = products.find(p => p.barcode?.toLowerCase() === barcode.toLowerCase().trim());
+            if (match) {
+              if (match.stock_quantity > 0) {
+                handleAddToCart(match);
+                triggerNotification(`${t('barcode')}: ${barcode}`, 'success');
+              } else {
+                triggerNotification(`${t('out_of_stock')}: ${match.name_ar || match.name_en || barcode}`, 'error');
+              }
+            } else {
+              triggerNotification(`${t('barcode')} ${barcode}: ${t('no_products_found')}`, 'error');
+            }
+          }} 
+          onClose={() => setShowCameraScanner(false)} 
+        />
+      )}
 
       {/* Checkout Modal */}
       {showCheckoutModal && (
