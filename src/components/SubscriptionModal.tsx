@@ -49,9 +49,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create',
-          shop_name: reqShopName,
+          merchant_name: reqShopName,
           phone: reqPhone,
-          requested_months: reqDuration,
+          duration_months: reqDuration,
           hardware_fingerprint: sysConfig?.hardware_fingerprint || 'unknown',
           current_license_key: sysConfig?.license_key || 'trial'
         })
