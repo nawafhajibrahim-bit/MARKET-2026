@@ -72,7 +72,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
             license_key: '',
             activation_status: false,
             last_sync_timestamp: '',
-            offline_grace_days_left: 5,
+            offline_grace_days_left: 14,
             hardware_fingerprint: hwFingerprint,
             activation_token: '',
             clock_tamper_detected: false
@@ -202,7 +202,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     const newActivationToken = await encryptData(tokenPayload, hwFingerprint);
 
                     await configDoc.incrementalPatch({ 
-                      offline_grace_days_left: 5,
+                      offline_grace_days_left: 14,
                       last_sync_timestamp: newSyncTime,
                       activation_token: newActivationToken,
                       clock_tamper_detected: false
@@ -240,7 +240,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         }
 
-        const remainingGrace = Math.max(0, 5 - daysPassed);
+        const remainingGrace = Math.max(0, 14 - daysPassed);
         if (remainingGrace > 0) {
             await configDoc.incrementalPatch({ offline_grace_days_left: remainingGrace });
             if (isMounted) {
@@ -293,7 +293,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           id: 'config',
           license_key: 'TRIAL',
           activation_status: true,
-          offline_grace_days_left: 5,
+          offline_grace_days_left: 14,
           last_sync_timestamp: new Date().toISOString(),
           hardware_fingerprint: hwFingerprint,
           activation_token: activationToken,
@@ -304,7 +304,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
             await existing.incrementalPatch({
               license_key: 'TRIAL',
               activation_status: true,
-              offline_grace_days_left: 5,
+              offline_grace_days_left: 14,
               last_sync_timestamp: new Date().toISOString(),
               hardware_fingerprint: hwFingerprint,
               activation_token: activationToken,
@@ -348,7 +348,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                   id: 'config',
                   license_key: licenseKey,
                   activation_status: true,
-                  offline_grace_days_left: 5,
+                  offline_grace_days_left: 14,
                   last_sync_timestamp: new Date().toISOString(),
                   hardware_fingerprint: hwFingerprint,
                   activation_token: activationToken,
@@ -359,7 +359,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                       await existing.incrementalPatch({ 
                         license_key: licenseKey, 
                         activation_status: true, 
-                        offline_grace_days_left: 5,
+                        offline_grace_days_left: 14,
                         last_sync_timestamp: new Date().toISOString(),
                         hardware_fingerprint: hwFingerprint,
                         activation_token: activationToken,
@@ -391,7 +391,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                   id: 'config',
                   license_key: licenseKey,
                   activation_status: true,
-                  offline_grace_days_left: 5,
+                  offline_grace_days_left: 14,
                   last_sync_timestamp: new Date().toISOString(),
                   hardware_fingerprint: hwFingerprint,
                   activation_token: encryptedToken,
@@ -402,7 +402,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                       await existing.incrementalPatch({ 
                         license_key: licenseKey, 
                         activation_status: true, 
-                        offline_grace_days_left: 5,
+                        offline_grace_days_left: 14,
                         last_sync_timestamp: new Date().toISOString(),
                         hardware_fingerprint: hwFingerprint,
                         activation_token: encryptedToken,
