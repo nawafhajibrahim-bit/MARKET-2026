@@ -14,8 +14,7 @@ export default function AIEngine() {
 
   useEffect(() => {
     const hasKey = !!localStorage.getItem('custom_groq_key');
-    const isDismissed = localStorage.getItem('dismiss_ai_warning') === 'true';
-    setShowAiWarning(!hasKey && !isDismissed);
+    setShowAiWarning(!hasKey);
   }, []);
 
   const handleDismissAiWarning = () => {
@@ -35,65 +34,32 @@ export default function AIEngine() {
     }
 
     try {
-      if (customKey) {
-        // VIP Business Route: Direct call to Groq
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${customKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: selectedModel,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.5
-          })
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          return errData.error?.message || t('ai_error_connect');
-        }
-
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || t('ai_no_response');
-      } else {
-        // Call our Vercel serverless proxy with the local license key
-        let licenseKey = '';
-        try {
-          const configDoc = await db.system_config.findOne('config').exec();
-          if (configDoc) {
-            licenseKey = configDoc.get('license_key') || '';
-          }
-        } catch (dbErr) {
-          console.error('Error fetching license key from DB:', dbErr);
-        }
-
-        if (!licenseKey) {
-          return t('license_required') || 'A valid license key is required to use AI features.';
-        }
-
-        const res = await fetch('/api/ai-chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            prompt,
-            model: selectedModel,
-            licenseKey,
-            timestamp: new Date().toISOString()
-          })
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          return errData.error || t('ai_error_connect');
-        }
-
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || t('ai_no_response');
+      if (!customKey) {
+        return t('custom_key_required') || 'Please enter your Groq API Key in Settings to use the AI features.';
       }
+
+      // VIP Business Route: Direct call to Groq
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${customKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.5
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        return errData.error?.message || t('ai_error_connect');
+      }
+
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || t('ai_no_response');
+      
     } catch (e) {
       console.error(e);
       return t('ai_error_connect');
@@ -238,11 +204,12 @@ ${dbContext}
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder={t('db_search_placeholder')} 
-              className="w-full pl-4 pr-12 py-3 rounded-lg bg-white dark:bg-[#1f2028] shadow-sm border border-transparent focus:border-blue-500 outline-none transition-all"
+              disabled={showAiWarning}
+              className="w-full pl-4 pr-12 py-3 rounded-lg bg-white dark:bg-[#1f2028] shadow-sm border border-transparent focus:border-blue-500 outline-none transition-all disabled:opacity-50"
             />
             <button 
               type="submit" 
-              disabled={loading || !query}
+              disabled={loading || !query || showAiWarning}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Send size={18} />

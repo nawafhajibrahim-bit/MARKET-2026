@@ -6,6 +6,7 @@ import { useDb } from '../database/Provider';
 import type { InvoiceDocType, DebtDocType, ProductDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
 import { ZReportModal } from '../components/ZReportModal';
+import { WelcomeModal } from '../components/WelcomeModal';
 
 const AIEngine = React.lazy(() => import('../modules/ai/AIEngine'));
 
@@ -399,6 +400,8 @@ export const Dashboard = () => {
           onClose={() => setShowZReport(false)}
         />
       )}
+      
+      <WelcomeModal />
     </div>
   );
 };
