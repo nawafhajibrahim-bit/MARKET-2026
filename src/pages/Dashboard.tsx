@@ -7,6 +7,8 @@ import type { InvoiceDocType, DebtDocType, ProductDocType } from '../database/sc
 import { formatCurrency } from '../utils/currency';
 import { ZReportModal } from '../components/ZReportModal';
 import { WelcomeModal } from '../components/WelcomeModal';
+import { SubscriptionModal } from '../components/SubscriptionModal';
+import { useAuth } from '../contexts/AuthContext';
 
 const AIEngine = React.lazy(() => import('../modules/ai/AIEngine'));
 
@@ -14,6 +16,9 @@ export const Dashboard = () => {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language.startsWith('ar');
   const db = useDb();
+  const { isAdmin } = useAuth();
+  
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [showZReport, setShowZReport] = useState(false);
   const [data, setData] = useState<{
@@ -214,9 +219,12 @@ export const Dashboard = () => {
               }
             </p>
             <div className="mt-3">
-              <a href="/settings" className="px-4 py-2 bg-white/50 hover:bg-white border border-black/10 dark:border-white/10 dark:bg-black/20 dark:hover:bg-black/40 rounded-lg text-sm font-bold transition-all cursor-pointer inline-flex">
-                {isAr ? 'اذهب لطلب التمديد من الإعدادات' : 'Go to Settings to Renew'}
-              </a>
+              <button 
+                onClick={() => setShowSubscriptionModal(true)}
+                className="px-4 py-2 bg-white/50 hover:bg-white border border-black/10 dark:border-white/10 dark:bg-black/20 dark:hover:bg-black/40 rounded-lg text-sm font-bold transition-all cursor-pointer inline-flex"
+              >
+                {isAr ? 'إدارة الاشتراك والتفعيل' : 'Manage Subscription'}
+              </button>
             </div>
           </div>
         </div>
@@ -224,7 +232,17 @@ export const Dashboard = () => {
 
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{t('dashboard')}</h2>
-        <div className="flex items-center gap-3">
+          
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => setShowSubscriptionModal(true)}
+              className="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-all flex items-center gap-2 border border-purple-500/20 shadow-sm"
+            >
+              <FileText size={18} />
+              {isAr ? 'تفعيل / ترقية الاشتراك' : 'Activate / Upgrade'}
+            </button>
+          )}
           <button
             onClick={() => setShowZReport(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all font-semibold text-sm cursor-pointer"
@@ -402,6 +420,8 @@ export const Dashboard = () => {
       )}
       
       <WelcomeModal />
+
+      {showSubscriptionModal && <SubscriptionModal onClose={() => setShowSubscriptionModal(false)} />}
     </div>
   );
 };
