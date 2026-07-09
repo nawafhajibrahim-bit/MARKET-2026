@@ -20,14 +20,37 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
 
   useEffect(() => {
     if (warningMessage) {
-      const dismissed = sessionStorage.getItem('dismissed_license_warning');
-      if (dismissed === warningMessage) {
-        setShowWarning(false);
-      } else {
-        setShowWarning(true);
+      const snoozedUntilStr = localStorage.getItem('license_warning_snooze_until');
+      if (snoozedUntilStr) {
+        const snoozedUntil = new Date(snoozedUntilStr);
+        if (new Date() < snoozedUntil) {
+          setShowWarning(false);
+          return;
+        }
       }
+      setShowWarning(true);
     }
   }, [warningMessage]);
+
+  const applyExpirationWarnings = (daysLeft: number, isTrial: boolean, isOffline: boolean = false) => {
+    if (daysLeft <= 15) {
+      if (isTrial) {
+        if (daysLeft <= 3) {
+          setWarningMessage(`تنبيه هام: متبقي لديك ${daysLeft} أيام فقط في الفترة التجريبية ${isOffline ? '(أوفلاين)' : ''}. يرجى أخذ نسخة احتياطية من بياناتك لتجنب فقدانها عند انتهاء التجربة وقفل البرنامج. للتفعيل الكامل اتصل بنا: ${OWNER_PHONE}`);
+        } else {
+          setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية ${isOffline ? '(أوفلاين)' : ''}، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+        }
+      } else {
+        if (daysLeft <= 3) {
+          setWarningMessage(`تنبيه هام جداً: اشتراكك سينتهي خلال ${daysLeft} أيام! ${isOffline ? '(أوفلاين)' : ''} يرجى طلب تمديد الاشتراك فوراً لتجنب توقف النظام. للتمديد اتصل بنا: ${OWNER_PHONE}`);
+        } else {
+          setWarningMessage(`تنبيه: اقترب موعد انتهاء اشتراكك. متبقي ${daysLeft} أيام. يرجى طلب تمديد الاشتراك لضمان استمرار عمل النظام. للتواصل: ${OWNER_PHONE}`);
+        }
+      }
+    } else {
+      setWarningMessage(null);
+    }
+  };
 
   const [inputKey, setInputKey] = useState('');
   const [loading, setLoading] = useState(false);
@@ -186,16 +209,8 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     });
 
                     if (isMounted) {
-                      if (isTrial) {
-                        const daysLeft = Math.max(0, Math.ceil((new Date(data.expiry_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                        if (daysLeft <= 3) {
-                          setWarningMessage(`تنبيه هام: متبقي لديك ${daysLeft} أيام فقط في الفترة التجريبية. يرجى أخذ نسخة احتياطية من بياناتك ومنتجاتك الآن (من صفحة الإعدادات) لتجنب فقدانها عند انتهاء التجربة وقفل البرنامج. للتفعيل الكامل اتصل بنا: ${OWNER_PHONE}`);
-                        } else {
-                          setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
-                        }
-                      } else {
-                        setWarningMessage(null);
-                      }
+                      const daysLeft = Math.max(0, Math.ceil((new Date(data.expiry_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+                      applyExpirationWarnings(daysLeft, isTrial, false);
                       setIsAuthorized(true);
                     }
                     return;
@@ -213,18 +228,16 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
             }
         }
 
-        // 4. Offline grace check for normal licenses
-        if (isTrial && expiryDateStr) {
+        // 4. Offline grace check for normal licenses & trials
+        if (expiryDateStr) {
           const daysLeft = Math.max(0, Math.ceil((new Date(expiryDateStr).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
           if (isMounted) {
-            if (daysLeft <= 3) {
-              setWarningMessage(`تنبيه هام: متبقي لديك ${daysLeft} أيام فقط في الفترة التجريبية (أوفلاين). يرجى أخذ نسخة احتياطية من بياناتك ومنتجاتك الآن (من صفحة الإعدادات) لتجنب فقدانها عند انتهاء التجربة وقفل البرنامج. للتفعيل الكامل اتصل بنا: ${OWNER_PHONE}`);
-            } else {
-              setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية (أوفلاين)، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
-            }
-            setIsAuthorized(true);
+            applyExpirationWarnings(daysLeft, isTrial, true);
           }
-          return;
+          if (isTrial) {
+            if (isMounted) setIsAuthorized(true);
+            return;
+          }
         }
 
         const remainingGrace = Math.max(0, 5 - daysPassed);
@@ -491,7 +504,9 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                   onClick={() => {
                     setShowWarning(false);
                     if (warningMessage) {
-                      sessionStorage.setItem('dismissed_license_warning', warningMessage);
+                      const snoozeDate = new Date();
+                      snoozeDate.setDate(snoozeDate.getDate() + 3);
+                      localStorage.setItem('license_warning_snooze_until', snoozeDate.toISOString());
                     }
                   }}
                   className="p-1 hover:bg-orange-600 rounded-lg transition-colors cursor-pointer flex items-center justify-center"

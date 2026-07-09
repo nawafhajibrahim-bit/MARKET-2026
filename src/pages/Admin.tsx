@@ -249,6 +249,49 @@ export const Admin = () => {
     }
   };
 
+  const handleQuickExtend = async (key: string, value: any, monthsToAdd: number) => {
+    if (!window.confirm(isAr ? `تأكيد تمديد الترخيص بمقدار ${monthsToAdd} أشهر؟` : `Confirm extending license by ${monthsToAdd} months?`)) return;
+    setLoading(true);
+    try {
+      const currentExpiry = new Date(value.expiry_date);
+      let baseDate = currentExpiry;
+      if (new Date() > currentExpiry) {
+        baseDate = new Date();
+      }
+      
+      const newExpiry = new Date(baseDate);
+      newExpiry.setMonth(newExpiry.getMonth() + monthsToAdd);
+      
+      const res = await fetch('/api/manage-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_secret: adminSecret,
+          action: 'save',
+          license_key: key,
+          expiry_date: newExpiry.toISOString(),
+          status: value.status,
+          merchant_name: value.merchant_name,
+          phone: value.phone,
+          max_devices: value.max_devices,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (res.ok) {
+        await fetchLicensesList();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to update license');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error, action failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateLicense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLicenseKey) return;
@@ -806,6 +849,37 @@ export const Admin = () => {
                               >
                                 <Edit2 size={16} />
                               </button>
+                              
+                              <div className="flex bg-black/5 dark:bg-white/5 rounded-lg p-0.5">
+                                <button
+                                  onClick={() => handleQuickExtend(key, value, 1)}
+                                  className="px-2 py-1 text-[10px] font-bold hover:bg-emerald-500 hover:text-white rounded-md transition-colors"
+                                  title="+1 Month"
+                                >
+                                  +1ش
+                                </button>
+                                <button
+                                  onClick={() => handleQuickExtend(key, value, 3)}
+                                  className="px-2 py-1 text-[10px] font-bold hover:bg-emerald-500 hover:text-white rounded-md transition-colors"
+                                  title="+3 Months"
+                                >
+                                  +3ش
+                                </button>
+                                <button
+                                  onClick={() => handleQuickExtend(key, value, 6)}
+                                  className="px-2 py-1 text-[10px] font-bold hover:bg-emerald-500 hover:text-white rounded-md transition-colors"
+                                  title="+6 Months"
+                                >
+                                  +6ش
+                                </button>
+                                <button
+                                  onClick={() => handleQuickExtend(key, value, 12)}
+                                  className="px-2 py-1 text-[10px] font-bold hover:bg-emerald-500 hover:text-white rounded-md transition-colors"
+                                  title="+1 Year"
+                                >
+                                  +1س
+                                </button>
+                              </div>
                               <button
                                 onClick={() => shareViaWhatsApp({
                                   key: key,
