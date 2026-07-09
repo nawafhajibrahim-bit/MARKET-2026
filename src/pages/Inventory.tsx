@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Plus, AlertTriangle, Trash2, X, Edit3, Download, Camera } from 'lucide-react';
+import { Search, Plus, AlertTriangle, Trash2, X, Edit3, Download, Camera, Info } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
@@ -668,6 +668,14 @@ export const Inventory = () => {
                     placeholder="0.50"
                   />
                 </div>
+                <div className="md:col-span-2 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mt-1 flex items-start gap-2">
+                  <div className="text-blue-500 mt-0.5">
+                    <Info size={16} />
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                    <strong className="font-bold">تنبيه هام لضبط الأرباح:</strong> تأكد أن (سعر التكلفة) و (سعر البيع) يمثلان تسعيرة <strong>للوحدة الأساسية المختارة</strong> (مثلاً: تكلفة الكيلو الواحد وليس الشوال كاملاً). وعند البيع يمكنك كتابة الكمية بالكسور (مثال: 1.5 كيلو) وسيحسب النظام الأرباح بدقة.
+                  </p>
+                </div>
                  <div>
                    <label className="block text-sm font-medium mb-1">
                      {editProductId 
@@ -677,6 +685,7 @@ export const Inventory = () => {
                    </label>
                    <input 
                      type="number" 
+                     step="any"
                      required
                      value={stockQuantity !== undefined ? stockQuantity : ''}
                      onChange={(e) => setStockQuantity(Number(e.target.value))}
