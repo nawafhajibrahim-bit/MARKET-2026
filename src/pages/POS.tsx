@@ -667,10 +667,16 @@ export const POS = () => {
                         );
                       })()}
                       
-                      {/* Quick Quantity Shortcuts */}
+                      {/* Quick Quantity & Amount Shortcuts */}
                       {(() => {
+                        const qtyEnabled = localStorage.getItem('pos_shortcuts_qty_enabled') === 'true';
+                        const amountEnabled = localStorage.getItem('pos_shortcuts_amount_enabled') === 'true';
+                        
+                        if (!qtyEnabled && !amountEnabled) return null;
+
                         const activeUnit = item.selectedUnit ? item.selectedUnit.unit_name.toLowerCase() : (item.product.unit || 'piece').toLowerCase();
-                        let shortcuts: { label: string, value: number, isAdd?: boolean }[] = [];
+                        let qtyShortcuts: { label: string, value: number, isAdd?: boolean }[] = [];
+                        let amountShortcuts: { label: string, value: number }[] = [];
 
                         const parseShortcuts = (storageKey: string, defaultVals: string, isAdd: boolean) => {
                           const str = localStorage.getItem(storageKey) || defaultVals;
@@ -682,37 +688,73 @@ export const POS = () => {
                           }).filter(Boolean) as { label: string, value: number, isAdd?: boolean }[];
                         };
 
-                        if (activeUnit === 'g' || activeUnit.includes('gram') || activeUnit.includes('غرام')) {
-                          shortcuts = parseShortcuts('pos_shortcuts_g', '50g, 100g, 250g, 500g', false);
-                        } else if (activeUnit === 'kg' || activeUnit.includes('kilo') || activeUnit.includes('كيلو')) {
-                          shortcuts = parseShortcuts('pos_shortcuts_kg', '¼, ½, 1, 2, 5', false).map(sc => {
-                            // Map special fractions back to their numeric values if user kept defaults
-                            if (sc.label === '¼') return { ...sc, value: 0.25 };
-                            if (sc.label === '½') return { ...sc, value: 0.5 };
-                            return sc;
-                          });
-                        } else {
-                          shortcuts = parseShortcuts('pos_shortcuts_piece', '+2, +5, +10, +12', true);
+                        if (qtyEnabled) {
+                          if (activeUnit === 'g' || activeUnit.includes('gram') || activeUnit.includes('غرام')) {
+                            qtyShortcuts = parseShortcuts('pos_shortcuts_g', '50g, 100g, 250g, 500g', false);
+                          } else if (activeUnit === 'kg' || activeUnit.includes('kilo') || activeUnit.includes('كيلو')) {
+                            qtyShortcuts = parseShortcuts('pos_shortcuts_kg', '¼, ½, 1, 2, 5', false).map(sc => {
+                              if (sc.label === '¼') return { ...sc, value: 0.25 };
+                              if (sc.label === '½') return { ...sc, value: 0.5 };
+                              return sc;
+                            });
+                          } else {
+                            qtyShortcuts = parseShortcuts('pos_shortcuts_piece', '+2, +5, +10, +12', true);
+                          }
                         }
 
+                        if (amountEnabled) {
+                          const amountStr = localStorage.getItem('pos_shortcuts_amount') || '1000, 5000, 10000';
+                          amountShortcuts = amountStr.split(',').map(s => {
+                            const val = parseFloat(s.trim());
+                            if (isNaN(val)) return null;
+                            return { label: s.trim(), value: val };
+                          }).filter(Boolean) as { label: string, value: number }[];
+                        }
+
+                        // Determine current unit price for amount calculation
+                        const unitPrice = item.selectedUnit ? item.selectedUnit.price_per_unit : item.product.sale_price;
+
                         return (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {shortcuts.map((sc, i) => (
-                              <button
-                                key={i}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (sc.isAdd) {
-                                    handleSetQuantity(index, item.quantity + sc.value);
-                                  } else {
-                                    handleSetQuantity(index, sc.value);
-                                  }
-                                }}
-                                className="px-2 py-0.5 text-[10px] font-bold bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white rounded transition-colors cursor-pointer"
-                              >
-                                {sc.label}
-                              </button>
-                            ))}
+                          <div className="flex flex-col gap-1 mt-2">
+                            {qtyEnabled && qtyShortcuts.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {qtyShortcuts.map((sc, i) => (
+                                  <button
+                                    key={`qty-${i}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (sc.isAdd) {
+                                        handleSetQuantity(index, item.quantity + sc.value);
+                                      } else {
+                                        handleSetQuantity(index, sc.value);
+                                      }
+                                    }}
+                                    className="px-2 py-0.5 text-[10px] font-bold bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white rounded transition-colors cursor-pointer"
+                                  >
+                                    {sc.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {amountEnabled && amountShortcuts.length > 0 && unitPrice > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {amountShortcuts.map((sc, i) => (
+                                  <button
+                                    key={`amt-${i}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const calculatedQty = sc.value / unitPrice;
+                                      handleSetQuantity(index, Number(calculatedQty.toFixed(3)));
+                                    }}
+                                    className="px-2 py-0.5 text-[10px] font-bold bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500 hover:text-white rounded transition-colors cursor-pointer"
+                                    title={`${sc.label} / ${unitPrice} = ${(sc.value / unitPrice).toFixed(3)}`}
+                                  >
+                                    {sc.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })()}

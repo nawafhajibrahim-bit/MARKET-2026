@@ -100,16 +100,23 @@ export const Settings = () => {
   const [printSuccess, setPrintSuccess] = useState<string | null>(null);
 
   // POS Shortcuts settings
+  const [shortcutsQtyEnabled, setShortcutsQtyEnabled] = useState(() => localStorage.getItem('pos_shortcuts_qty_enabled') === 'true');
   const [shortcutsG, setShortcutsG] = useState(() => localStorage.getItem('pos_shortcuts_g') || '50, 100, 250, 500');
   const [shortcutsKg, setShortcutsKg] = useState(() => localStorage.getItem('pos_shortcuts_kg') || '0.25, 0.5, 1, 2, 5');
   const [shortcutsPiece, setShortcutsPiece] = useState(() => localStorage.getItem('pos_shortcuts_piece') || '+2, +5, +10, +12');
+  
+  const [shortcutsAmountEnabled, setShortcutsAmountEnabled] = useState(() => localStorage.getItem('pos_shortcuts_amount_enabled') === 'true');
+  const [shortcutsAmount, setShortcutsAmount] = useState(() => localStorage.getItem('pos_shortcuts_amount') || '1000, 5000, 10000');
   const [shortcutsSuccess, setShortcutsSuccess] = useState<string | null>(null);
 
   const saveShortcutsSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    localStorage.setItem('pos_shortcuts_qty_enabled', shortcutsQtyEnabled ? 'true' : 'false');
     localStorage.setItem('pos_shortcuts_g', shortcutsG);
     localStorage.setItem('pos_shortcuts_kg', shortcutsKg);
     localStorage.setItem('pos_shortcuts_piece', shortcutsPiece);
+    localStorage.setItem('pos_shortcuts_amount_enabled', shortcutsAmountEnabled ? 'true' : 'false');
+    localStorage.setItem('pos_shortcuts_amount', shortcutsAmount);
     setShortcutsSuccess(isAr ? 'تم حفظ أزرار الكميات السريعة بنجاح' : 'Quantity shortcuts saved successfully');
     setTimeout(() => setShortcutsSuccess(null), 3000);
   };
@@ -1180,40 +1187,97 @@ export const Settings = () => {
         </div>
 
         <form onSubmit={saveShortcutsSettings} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-black/5 dark:border-white/5">
-                <div>
-                    <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الغرام (g)' : 'Gram (g) Shortcuts'}</label>
-                    <input 
-                        type="text"
-                        value={shortcutsG}
-                        onChange={(e) => setShortcutsG(e.target.value)}
-                        placeholder="50, 100, 250, 500"
-                        className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'افصل بين الأرقام بفاصلة' : 'Comma separated values'}</p>
+            {/* Quantity Shortcuts Settings */}
+            <div className="pt-4">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium text-lg">{isAr ? 'أزرار الكميات (أوزان وقطع)' : 'Quantity Buttons (Weights & Pieces)'}</h4>
+                    <label className="flex items-center cursor-pointer">
+                        <div className="relative">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only" 
+                                checked={shortcutsQtyEnabled}
+                                onChange={(e) => setShortcutsQtyEnabled(e.target.checked)}
+                            />
+                            <div className={`block w-14 h-8 rounded-full transition-colors ${shortcutsQtyEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${shortcutsQtyEnabled ? 'transform translate-x-6' : ''}`}></div>
+                        </div>
+                    </label>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الكيلو (kg)' : 'Kilo (kg) Shortcuts'}</label>
-                    <input 
-                        type="text"
-                        value={shortcutsKg}
-                        onChange={(e) => setShortcutsKg(e.target.value)}
-                        placeholder="0.25, 0.5, 1, 2, 5"
-                        className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'مثال للكسور: 0.25' : 'Example fractions: 0.25'}</p>
+                
+                {shortcutsQtyEnabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الغرام (g)' : 'Gram (g) Shortcuts'}</label>
+                            <input 
+                                type="text"
+                                value={shortcutsG}
+                                onChange={(e) => setShortcutsG(e.target.value)}
+                                placeholder="50, 100, 250, 500"
+                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'افصل بين الأرقام بفاصلة' : 'Comma separated values'}</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الكيلو (kg)' : 'Kilo (kg) Shortcuts'}</label>
+                            <input 
+                                type="text"
+                                value={shortcutsKg}
+                                onChange={(e) => setShortcutsKg(e.target.value)}
+                                placeholder="0.25, 0.5, 1, 2, 5"
+                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'مثال للكسور: 0.25' : 'Example fractions: 0.25'}</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الوحدات الأخرى' : 'Other Units Shortcuts'}</label>
+                            <input 
+                                type="text"
+                                value={shortcutsPiece}
+                                onChange={(e) => setShortcutsPiece(e.target.value)}
+                                placeholder="+2, +5, +10, +12"
+                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'استخدم + للزيادة بدلاً من الاستبدال' : 'Use + to add instead of replace'}</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Amount Shortcuts Settings */}
+            <div className="pt-4 border-t border-black/5 dark:border-white/5">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h4 className="font-medium text-lg">{isAr ? 'أزرار المبالغ النقدية' : 'Amount Buttons'}</h4>
+                        <p className="text-sm text-gray-500">{isAr ? 'حساب الكمية تلقائياً عند الضغط على مبلغ (مثال: 5000)' : 'Auto-calculate quantity when clicking an amount (e.g. 5000)'}</p>
+                    </div>
+                    <label className="flex items-center cursor-pointer">
+                        <div className="relative">
+                            <input 
+                                type="checkbox" 
+                                className="sr-only" 
+                                checked={shortcutsAmountEnabled}
+                                onChange={(e) => setShortcutsAmountEnabled(e.target.checked)}
+                            />
+                            <div className={`block w-14 h-8 rounded-full transition-colors ${shortcutsAmountEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                            <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${shortcutsAmountEnabled ? 'transform translate-x-6' : ''}`}></div>
+                        </div>
+                    </label>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الوحدات الأخرى' : 'Other Units Shortcuts'}</label>
-                    <input 
-                        type="text"
-                        value={shortcutsPiece}
-                        onChange={(e) => setShortcutsPiece(e.target.value)}
-                        placeholder="+2, +5, +10, +12"
-                        className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'استخدم + للزيادة بدلاً من الاستبدال' : 'Use + to add instead of replace'}</p>
-                </div>
+                
+                {shortcutsAmountEnabled && (
+                    <div className="p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
+                        <label className="block text-sm font-medium mb-1">{isAr ? 'المبالغ المقترحة' : 'Suggested Amounts'}</label>
+                        <input 
+                            type="text"
+                            value={shortcutsAmount}
+                            onChange={(e) => setShortcutsAmount(e.target.value)}
+                            placeholder="1000, 5000, 10000"
+                            className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'افصل بين المبالغ بفاصلة' : 'Comma separated values'}</p>
+                    </div>
+                )}
             </div>
 
             <div className="flex justify-end pt-4 border-t border-black/5 dark:border-white/5">
