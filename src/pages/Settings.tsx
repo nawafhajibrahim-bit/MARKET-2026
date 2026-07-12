@@ -21,6 +21,67 @@ import {
   pickBackupFolder,
   clearFolderSelection,
 } from '../services/folderBackupService';
+const ShortcutInput = ({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder?: string }) => {
+  const { t, i18n } = useTranslation();
+  const isAr = i18n.language.startsWith('ar');
+  const [inputValue, setInputValue] = useState('');
+  
+  const chips = value.split(',').map(s => s.trim()).filter(Boolean);
+
+  const handleAdd = () => {
+    if (inputValue.trim()) {
+      const newChips = [...chips, inputValue.trim()];
+      onChange(newChips.join(', '));
+      setInputValue('');
+    }
+  };
+
+  const handleRemove = (indexToRemove: number) => {
+    const newChips = chips.filter((_, idx) => idx !== indexToRemove);
+    onChange(newChips.join(', '));
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        {chips.map((chip, idx) => (
+          <div key={idx} className="flex items-center gap-1 bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-1 rounded-md text-sm font-medium">
+            <span dir="ltr">{chip}</span>
+            <button 
+              type="button" 
+              onClick={() => handleRemove(idx)}
+              className="hover:bg-[var(--color-primary)]/20 p-0.5 rounded-full text-[var(--color-primary)] transition-colors cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input 
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder={placeholder || (isAr ? 'أدخل الرقم واضغط Enter' : 'Enter number and press Enter')}
+          className="flex-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr text-sm"
+        />
+        <button 
+          type="button" 
+          onClick={handleAdd}
+          className="px-3 py-2 bg-[var(--color-primary)] text-white text-sm font-medium rounded-lg hover:brightness-110 transition-colors cursor-pointer"
+        >
+          {isAr ? 'إضافة' : 'Add'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const Settings = () => {
   const { t, i18n } = useTranslation();
@@ -1209,34 +1270,25 @@ export const Settings = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
                         <div>
                             <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الغرام (g)' : 'Gram (g) Shortcuts'}</label>
-                            <input 
-                                type="text"
+                            <ShortcutInput 
                                 value={shortcutsG}
-                                onChange={(e) => setShortcutsG(e.target.value)}
-                                placeholder="50, 100, 250, 500"
-                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                                onChange={setShortcutsG}
                             />
-                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'افصل بين الأرقام بفاصلة' : 'Comma separated values'}</p>
+                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'اكتب الرقم واضغط Enter' : 'Type number and press Enter'}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الكيلو (kg)' : 'Kilo (kg) Shortcuts'}</label>
-                            <input 
-                                type="text"
+                            <ShortcutInput 
                                 value={shortcutsKg}
-                                onChange={(e) => setShortcutsKg(e.target.value)}
-                                placeholder="0.25, 0.5, 1, 2, 5"
-                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                                onChange={setShortcutsKg}
                             />
                             <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'مثال للكسور: 0.25' : 'Example fractions: 0.25'}</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الوحدات الأخرى' : 'Other Units Shortcuts'}</label>
-                            <input 
-                                type="text"
+                            <ShortcutInput 
                                 value={shortcutsPiece}
-                                onChange={(e) => setShortcutsPiece(e.target.value)}
-                                placeholder="+2, +5, +10, +12"
-                                className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                                onChange={setShortcutsPiece}
                             />
                             <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'استخدم + للزيادة بدلاً من الاستبدال' : 'Use + to add instead of replace'}</p>
                         </div>
@@ -1268,14 +1320,11 @@ export const Settings = () => {
                 {shortcutsAmountEnabled && (
                     <div className="p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
                         <label className="block text-sm font-medium mb-1">{isAr ? 'المبالغ المقترحة' : 'Suggested Amounts'}</label>
-                        <input 
-                            type="text"
+                        <ShortcutInput 
                             value={shortcutsAmount}
-                            onChange={(e) => setShortcutsAmount(e.target.value)}
-                            placeholder="1000, 5000, 10000"
-                            className="w-full px-4 py-2 rounded-lg bg-white dark:bg-[#2a2b36] border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
+                            onChange={setShortcutsAmount}
                         />
-                        <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'افصل بين المبالغ بفاصلة' : 'Comma separated values'}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'اكتب المبلغ واضغط Enter' : 'Type amount and press Enter'}</p>
                     </div>
                 )}
             </div>

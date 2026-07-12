@@ -703,12 +703,16 @@ export const POS = () => {
                         }
 
                         if (amountEnabled) {
-                          const amountStr = localStorage.getItem('pos_shortcuts_amount') || '1000, 5000, 10000';
-                          amountShortcuts = amountStr.split(',').map(s => {
-                            const val = parseFloat(s.trim());
-                            if (isNaN(val)) return null;
-                            return { label: s.trim(), value: val };
-                          }).filter(Boolean) as { label: string, value: number }[];
+                          const isWeightUnit = activeUnit === 'g' || activeUnit.includes('gram') || activeUnit.includes('غرام') || activeUnit === 'kg' || activeUnit.includes('kilo') || activeUnit.includes('كيلو');
+                          
+                          if (isWeightUnit) {
+                            const amountStr = localStorage.getItem('pos_shortcuts_amount') || '1000, 5000, 10000';
+                            amountShortcuts = amountStr.split(',').map(s => {
+                              const val = parseFloat(s.trim());
+                              if (isNaN(val)) return null;
+                              return { label: s.trim(), value: val };
+                            }).filter(Boolean) as { label: string, value: number }[];
+                          }
                         }
 
                         // Determine current unit price for amount calculation
