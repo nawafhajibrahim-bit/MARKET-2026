@@ -721,7 +721,8 @@ export const POS = () => {
                         return (
                           <div className="flex flex-col gap-1 mt-2">
                             {qtyEnabled && qtyShortcuts.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap ml-1">{isAr ? 'الكمية:' : 'Qty:'}</span>
                                 {qtyShortcuts.map((sc, i) => (
                                   <button
                                     key={`qty-${i}`}
@@ -742,7 +743,8 @@ export const POS = () => {
                             )}
                             
                             {amountEnabled && amountShortcuts.length > 0 && unitPrice > 0 && (
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap ml-1">{isAr ? 'المبلغ:' : 'Amount:'}</span>
                                 {amountShortcuts.map((sc, i) => (
                                   <button
                                     key={`amt-${i}`}
@@ -781,19 +783,17 @@ export const POS = () => {
                         <Minus size={14} />
                       </button>
                       <input 
-                        type="number"
-                        min="0"
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
                         value={item.quantity}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (!isNaN(val) && val > 0) {
+                          const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                          if (!isNaN(val)) {
                             handleSetQuantity(index, val);
                           }
                         }}
-                        className="w-20 font-mono px-1 text-center text-sm font-semibold bg-transparent outline-none"
-                        style={{ MozAppearance: 'textfield' }}
+                        className="w-20 font-mono px-1 text-center text-sm font-semibold bg-transparent outline-none dir-ltr"
                       />
                       <button 
                         onClick={() => handleQuantityChange(index, 1)}
