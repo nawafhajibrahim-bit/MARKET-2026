@@ -795,7 +795,7 @@ export const POS = () => {
                             handleSetQuantity(index, val);
                           }
                         }}
-                        className="w-20 font-mono px-1 text-center text-sm font-semibold bg-transparent outline-none dir-ltr"
+                        className="w-28 px-1 text-center text-base font-bold bg-transparent outline-none dir-ltr"
                         style={{ MozAppearance: 'textfield' }}
                       />
                       <button 
