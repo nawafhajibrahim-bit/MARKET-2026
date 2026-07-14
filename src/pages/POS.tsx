@@ -783,17 +783,20 @@ export const POS = () => {
                         <Minus size={14} />
                       </button>
                       <input 
-                        type="text"
-                        inputMode="decimal"
+                        type="number"
+                        min="0"
+                        step="any"
+                        lang="en"
                         value={item.quantity}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                          if (!isNaN(val)) {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val >= 0) {
                             handleSetQuantity(index, val);
                           }
                         }}
                         className="w-20 font-mono px-1 text-center text-sm font-semibold bg-transparent outline-none dir-ltr"
+                        style={{ MozAppearance: 'textfield' }}
                       />
                       <button 
                         onClick={() => handleQuantityChange(index, 1)}
