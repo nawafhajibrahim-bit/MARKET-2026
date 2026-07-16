@@ -425,6 +425,7 @@ export const Settings = () => {
       const productsDocs = await db.products.find().exec();
       const debtsDocs = await db.debts.find().exec();
       const invoicesDocs = await db.invoices.find().exec();
+      const purchasesDocs = await db.purchases.find().exec();
       
       const products = productsDocs.map(d => d.toJSON());
       const debts = debtsDocs.map(d => {
@@ -452,20 +453,34 @@ export const Settings = () => {
               'الخصم': json.discount_amount
           };
       });
+      const simplifiedPurchases = purchasesDocs.map(d => {
+          const json = d.toJSON();
+          return {
+              'رقم الفاتورة': json.purchase_id,
+              'التاريخ': new Date(json.timestamp).toLocaleString(),
+              'المورد': json.supplier_name,
+              'المبلغ الإجمالي': json.total_amount,
+              'العملة': json.currency,
+              'ملاحظات': json.notes || ''
+          };
+      });
 
       const wb = XLSX.utils.book_new();
 
       const wsProducts = XLSX.utils.json_to_sheet(products.length ? products : [{Message: "لا يوجد بيانات"}]);
       const wsDebts = XLSX.utils.json_to_sheet(debts.length ? debts : [{Message: "لا يوجد بيانات"}]);
       const wsInvoices = XLSX.utils.json_to_sheet(simplifiedInvoices.length ? simplifiedInvoices : [{Message: "لا يوجد بيانات"}]);
+      const wsPurchases = XLSX.utils.json_to_sheet(simplifiedPurchases.length ? simplifiedPurchases : [{Message: "لا يوجد بيانات"}]);
 
       wsProducts['!dir'] = 'rtl';
       wsDebts['!dir'] = 'rtl';
       wsInvoices['!dir'] = 'rtl';
+      wsPurchases['!dir'] = 'rtl';
 
       XLSX.utils.book_append_sheet(wb, wsProducts, "المنتجات (Products)");
       XLSX.utils.book_append_sheet(wb, wsDebts, "الديون (Debts)");
       XLSX.utils.book_append_sheet(wb, wsInvoices, "المبيعات (Sales)");
+      XLSX.utils.book_append_sheet(wb, wsPurchases, "المشتريات (Purchases)");
 
       XLSX.writeFile(wb, `SmartMarket_Data_${new Date().toISOString().split('T')[0]}.xlsx`);
 
@@ -965,7 +980,7 @@ export const Settings = () => {
                     disabled={localBackupStatus === 'loading'}
                     className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold rounded-xl active:scale-95 disabled:opacity-50 transition-all cursor-pointer text-center"
                 >
-                    <Download size={18} /> {isAr ? 'تصدير إكسل (Excel)' : 'Export Excel'}
+                    <Download size={18} /> {isAr ? 'تصدير نسخة شاملة (Excel)' : 'Export Full Backup (Excel)'}
                 </button>
 
                 <div className="flex-1 relative min-w-[200px]">
