@@ -21,64 +21,49 @@ import {
   pickBackupFolder,
   clearFolderSelection,
 } from '../services/folderBackupService';
-const ShortcutInput = ({ value, onChange, placeholder }: { value: string, onChange: (val: string) => void, placeholder?: string }) => {
-  const { t, i18n } = useTranslation();
+const MultiBoxInput = ({ value, onChange, maxSlots = 8, placeholder }: { value: string, onChange: (val: string) => void, maxSlots?: number, placeholder?: string }) => {
+  const { i18n } = useTranslation();
   const isAr = i18n.language.startsWith('ar');
-  const [inputValue, setInputValue] = useState('');
-  
-  const chips = value.split(',').map(s => s.trim()).filter(Boolean);
 
-  const handleAdd = () => {
-    if (inputValue.trim()) {
-      const newChips = [...chips, inputValue.trim()];
-      onChange(newChips.join(', '));
-      setInputValue('');
-    }
+  // Parse existing comma-separated values into array of fixed size
+  const parseToBoxes = (val: string): string[] => {
+    const parts = val.split(',').map(s => s.trim()).filter(Boolean);
+    const boxes = Array(maxSlots).fill('');
+    parts.forEach((p, i) => { if (i < maxSlots) boxes[i] = p; });
+    return boxes;
   };
 
-  const handleRemove = (indexToRemove: number) => {
-    const newChips = chips.filter((_, idx) => idx !== indexToRemove);
-    onChange(newChips.join(', '));
+  const [boxes, setBoxes] = useState<string[]>(() => parseToBoxes(value));
+
+  // Sync if external value changes
+  useEffect(() => {
+    setBoxes(parseToBoxes(value));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, maxSlots]);
+
+  const handleChange = (idx: number, val: string) => {
+    const newBoxes = [...boxes];
+    newBoxes[idx] = val;
+    setBoxes(newBoxes);
+    // Emit as comma-separated string, filtering empty
+    onChange(newBoxes.filter(Boolean).join(', '));
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        {chips.map((chip, idx) => (
-          <div key={idx} className="flex items-center gap-1 bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-1 rounded-md text-sm font-medium">
-            <span dir="ltr">{chip}</span>
-            <button 
-              type="button" 
-              onClick={() => handleRemove(idx)}
-              className="hover:bg-[var(--color-primary)]/20 p-0.5 rounded-full text-[var(--color-primary)] transition-colors cursor-pointer"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <input 
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-          placeholder={placeholder || (isAr ? 'أدخل الرقم واضغط Enter' : 'Enter number and press Enter')}
-          className="flex-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr text-sm"
-        />
-        <button 
-          type="button" 
-          onClick={handleAdd}
-          className="px-3 py-2 bg-[var(--color-primary)] text-white text-sm font-medium rounded-lg hover:brightness-110 transition-colors cursor-pointer"
-        >
-          {isAr ? 'إضافة' : 'Add'}
-        </button>
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {boxes.map((box, idx) => (
+        <div key={idx} className="flex flex-col items-center gap-0.5">
+          <span className="text-[10px] text-gray-400 font-medium">{idx + 1}</span>
+          <input
+            type="text"
+            dir="ltr"
+            value={box}
+            placeholder={placeholder || (isAr ? '—' : '—')}
+            onChange={(e) => handleChange(idx, e.target.value)}
+            className="w-16 px-2 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all text-sm text-center font-medium"
+          />
+        </div>
+      ))}
     </div>
   );
 };
@@ -1267,30 +1252,33 @@ export const Settings = () => {
                 </div>
                 
                 {shortcutsQtyEnabled && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
+                    <div className="flex flex-col gap-5 p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
                         <div>
-                            <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الغرام (g)' : 'Gram (g) Shortcuts'}</label>
-                            <ShortcutInput 
+                            <label className="block text-sm font-medium mb-2">{isAr ? 'اختصارات الغرام (g)' : 'Gram (g) Shortcuts'}</label>
+                            <MultiBoxInput 
                                 value={shortcutsG}
                                 onChange={setShortcutsG}
+                                maxSlots={6}
                             />
-                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'اكتب الرقم واضغط Enter' : 'Type number and press Enter'}</p>
+                            <p className="text-[10px] text-gray-500 mt-1.5">{isAr ? 'أدخل قيمة في كل خانة (مثال: 50، 100، 250)' : 'Enter a value in each box (e.g. 50, 100, 250)'}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الكيلو (kg)' : 'Kilo (kg) Shortcuts'}</label>
-                            <ShortcutInput 
+                            <label className="block text-sm font-medium mb-2">{isAr ? 'اختصارات الكيلو (kg)' : 'Kilo (kg) Shortcuts'}</label>
+                            <MultiBoxInput 
                                 value={shortcutsKg}
                                 onChange={setShortcutsKg}
+                                maxSlots={6}
                             />
-                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'مثال للكسور: 0.25' : 'Example fractions: 0.25'}</p>
+                            <p className="text-[10px] text-gray-500 mt-1.5">{isAr ? 'مثال للكسور: 0.25، 0.5' : 'Fractions allowed, e.g. 0.25, 0.5'}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">{isAr ? 'اختصارات الوحدات الأخرى' : 'Other Units Shortcuts'}</label>
-                            <ShortcutInput 
+                            <label className="block text-sm font-medium mb-2">{isAr ? 'اختصارات الوحدات الأخرى' : 'Other Units Shortcuts'}</label>
+                            <MultiBoxInput 
                                 value={shortcutsPiece}
                                 onChange={setShortcutsPiece}
+                                maxSlots={6}
                             />
-                            <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'استخدم + للزيادة بدلاً من الاستبدال' : 'Use + to add instead of replace'}</p>
+                            <p className="text-[10px] text-gray-500 mt-1.5">{isAr ? 'استخدم + للزيادة مثل: +2، +5' : 'Use + to add instead of replace, e.g. +2, +5'}</p>
                         </div>
                     </div>
                 )}
@@ -1319,12 +1307,13 @@ export const Settings = () => {
                 
                 {shortcutsAmountEnabled && (
                     <div className="p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
-                        <label className="block text-sm font-medium mb-1">{isAr ? 'المبالغ المقترحة' : 'Suggested Amounts'}</label>
-                        <ShortcutInput 
+                        <label className="block text-sm font-medium mb-2">{isAr ? 'المبالغ المقترحة' : 'Suggested Amounts'}</label>
+                        <MultiBoxInput 
                             value={shortcutsAmount}
                             onChange={setShortcutsAmount}
+                            maxSlots={8}
                         />
-                        <p className="text-[10px] text-gray-500 mt-1">{isAr ? 'اكتب المبلغ واضغط Enter' : 'Type amount and press Enter'}</p>
+                        <p className="text-[10px] text-gray-500 mt-1.5">{isAr ? 'أدخل مبلغاً في كل خانة — حتى 8 مبالغ مختلفة' : 'Enter an amount in each box — up to 8 amounts'}</p>
                     </div>
                 )}
             </div>

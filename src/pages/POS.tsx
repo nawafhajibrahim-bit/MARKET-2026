@@ -751,10 +751,11 @@ export const POS = () => {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const calculatedQty = sc.value / unitPrice;
-                                      handleSetQuantity(index, Number(calculatedQty.toFixed(3)));
+                                      const rounded = parseFloat(calculatedQty.toFixed(4));
+                                      handleSetQuantity(index, rounded);
                                     }}
                                     className="px-2 py-0.5 text-[10px] font-bold bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500 hover:text-white rounded transition-colors cursor-pointer"
-                                    title={`${sc.label} / ${unitPrice} = ${(sc.value / unitPrice).toFixed(3)}`}
+                                    title={`${sc.label} ÷ ${unitPrice} = ${(sc.value / unitPrice).toFixed(4)} g`}
                                   >
                                     {sc.label}
                                   </button>
@@ -795,7 +796,7 @@ export const POS = () => {
                             handleSetQuantity(index, val);
                           }
                         }}
-                        className="w-28 px-1 text-center text-base font-bold bg-transparent outline-none dir-ltr"
+                        className="w-36 px-1 text-center text-base font-bold bg-transparent outline-none dir-ltr"
                         style={{ MozAppearance: 'textfield' }}
                       />
                       <button 
