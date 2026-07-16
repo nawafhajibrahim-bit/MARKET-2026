@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle, Camera } from 'lucide-react';
+import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle, Camera, Keyboard, X } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList, getPOSHelperCurrency, setPOSHelperCurrency } from '../utils/currency';
@@ -105,12 +105,16 @@ export const POS = () => {
     }
   });
 
+  // Keyboard shortcuts panel state
+  const [showShortcutsPanel, setShowShortcutsPanel] = useState(false);
+
   // Keyboard shortcuts (refs avoid stale closures and dependency issues)
   const cartRef = useRef(cart);
   const selectedCartIndexRef = useRef(selectedCartIndex);
   const showModalRef = useRef(showCheckoutModal);
   const completedRef = useRef(completedInvoice);
   const tRef = useRef(t);
+  const showShortcutsPanelRef = useRef(showShortcutsPanel);
   const handlersRef = useRef({
     handleQuantityChange,
     handleRemoveFromCart,
@@ -119,6 +123,8 @@ export const POS = () => {
     setShowCheckoutModal,
     setSelectedCartIndex,
     setSearchTerm,
+    setShowShortcutsPanel,
+    setShowConverter: (_fn: ((prev: boolean) => boolean) | boolean) => {},
   });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,6 +134,7 @@ export const POS = () => {
     showModalRef.current = showCheckoutModal;
     completedRef.current = completedInvoice;
     tRef.current = t;
+    showShortcutsPanelRef.current = showShortcutsPanel;
     handlersRef.current = {
       handleQuantityChange,
       handleRemoveFromCart,
@@ -136,6 +143,8 @@ export const POS = () => {
       setShowCheckoutModal,
       setSelectedCartIndex,
       setSearchTerm,
+      setShowShortcutsPanel,
+      setShowConverter,
     };
   });
 
@@ -151,10 +160,24 @@ export const POS = () => {
         return;
       }
 
+      // ?: Toggle shortcuts panel (works everywhere when not in input)
+      if (e.key === '?' && !isInInput) {
+        e.preventDefault();
+        handlersRef.current.setShowShortcutsPanel(prev => !prev);
+        return;
+      }
+
+      // Escape: close shortcuts panel if open
+      if (e.key === 'Escape' && showShortcutsPanelRef.current) {
+        e.preventDefault();
+        handlersRef.current.setShowShortcutsPanel(false);
+        return;
+      }
+
       // Block other shortcuts when typing in inputs
       if (isInInput) return;
 
-      // Block when modal is open or print preview is showing
+      // Block when checkout modal is open or print preview is showing
       if (showModalRef.current || completedRef.current) return;
 
       const h = handlersRef.current;
@@ -184,6 +207,16 @@ export const POS = () => {
         return;
       }
 
+      if (e.key === 'F4') {
+        e.preventDefault();
+        h.setShowConverter((prev: boolean) => !prev);
+        if (!showModalRef.current) {
+          h.setPaymentType('cash');
+          if (c.length > 0) h.setShowCheckoutModal(true);
+        }
+        return;
+      }
+
       if (e.key === '+' || e.key === 'NumpadAdd') {
         e.preventDefault();
         const idx = selIdx ?? (c.length > 0 ? c.length - 1 : null);
@@ -198,12 +231,30 @@ export const POS = () => {
         return;
       }
 
+      // ArrowUp: select previous cart item
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (c.length === 0) return;
+        const cur = selIdx ?? c.length - 1;
+        h.setSelectedCartIndex(Math.max(0, cur - 1));
+        return;
+      }
+
+      // ArrowDown: select next cart item
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (c.length === 0) return;
+        const cur = selIdx ?? 0;
+        h.setSelectedCartIndex(Math.min(c.length - 1, cur + 1));
+        return;
+      }
+
       if (e.key === 'Delete') {
         e.preventDefault();
         const idx = selIdx ?? (c.length > 0 ? c.length - 1 : null);
         if (idx !== null) {
           h.handleRemoveFromCart(idx);
-          h.setSelectedCartIndex(prev => {
+          h.setSelectedCartIndex((prev: number | null) => {
             if (prev === null) return null;
             if (prev >= c.length - 1) return Math.max(0, c.length - 2);
             return prev;
@@ -833,10 +884,12 @@ export const POS = () => {
                  setShowCheckoutModal(true);
                }}
                disabled={cart.length === 0}
+               title={isAr ? 'دفع نقدي (F2)' : 'Cash payment (F2)'}
                className="flex flex-col items-center justify-center gap-2 py-3 bg-green-500 hover:brightness-110 active:scale-95 text-white rounded-xl transition-all font-semibold cursor-pointer disabled:opacity-50"
              >
                <DollarSign size={18} />
-               {t('cash')}
+               <span>{t('cash')}</span>
+               <span className="text-[10px] opacity-70 font-mono">F2</span>
              </button>
              <button 
                onClick={() => {
@@ -844,17 +897,139 @@ export const POS = () => {
                  setShowCheckoutModal(true);
                }}
                disabled={cart.length === 0}
+               title={isAr ? 'بيع بالدين (F3)' : 'Debt / on account (F3)'}
                className="flex flex-col items-center justify-center gap-2 py-3 bg-blue-500 hover:brightness-110 active:scale-95 text-white rounded-xl transition-all font-semibold cursor-pointer disabled:opacity-50"
              >
                <HandCoins size={18} />
-               {t('debt')}
+               <span>{t('debt')}</span>
+               <span className="text-[10px] opacity-70 font-mono">F3</span>
              </button>
           </div>
-          <div className="text-[10px] text-gray-400 text-center mt-2 select-none">
-            F1: {t('search_barcode')} | F2: {t('cash')} | F3: {t('debt')} | +/- : {i18n.language === 'ar' ? 'الكمية' : 'Qty'} | Del: {t('delete_confirm_btn')}
+          {/* Shortcuts hint bar */}
+          <div className="flex items-center justify-between mt-2">
+            <div className="text-[10px] text-gray-400 select-none">
+              <span className="font-mono bg-black/10 dark:bg-white/10 px-1 rounded">F1</span> {isAr ? 'بحث' : 'Search'}
+              {' · '}
+              <span className="font-mono bg-black/10 dark:bg-white/10 px-1 rounded">+/-</span> {isAr ? 'كمية' : 'Qty'}
+              {' · '}
+              <span className="font-mono bg-black/10 dark:bg-white/10 px-1 rounded">↑↓</span> {isAr ? 'تنقل' : 'Nav'}
+            </div>
+            <button
+              onClick={() => setShowShortcutsPanel(true)}
+              title={isAr ? 'اختصارات لوحة المفاتيح (?)' : 'Keyboard shortcuts (?)'}
+              className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-[var(--color-primary)] transition-colors cursor-pointer px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+            >
+              <Keyboard size={12} />
+              <span>{isAr ? 'الاختصارات' : 'Shortcuts'}</span>
+              <span className="font-mono bg-black/10 dark:bg-white/10 px-1 rounded text-[9px]">?</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Keyboard Shortcuts Help Panel */}
+      {showShortcutsPanel && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[160] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowShortcutsPanel(false); }}
+        >
+          <div className="bg-white dark:bg-[#1f2028] rounded-2xl w-full max-w-lg shadow-2xl border border-black/10 dark:border-white/10 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-black/5 dark:border-white/5 bg-[var(--color-primary)]/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                  <Keyboard size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">{isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard Shortcuts'}</h3>
+                  <p className="text-xs text-gray-500">{isAr ? 'اضغط ? في أي وقت لعرض هذه القائمة' : 'Press ? anytime to show this panel'}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShortcutsPanel(false)}
+                className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Shortcut groups */}
+            <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+
+              {/* Navigation */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">{isAr ? 'التنقل' : 'Navigation'}</h4>
+                <div className="space-y-1">
+                  {[
+                    { keys: ['F1'], desc: isAr ? 'تركيز على خانة البحث' : 'Focus search bar' },
+                    { keys: ['↑', '↓'], desc: isAr ? 'التنقل بين منتجات السلة' : 'Navigate cart items' },
+                    { keys: ['Esc'], desc: isAr ? 'مسح البحث / إغلاق' : 'Clear search / close' },
+                    { keys: ['?'], desc: isAr ? 'فتح / إغلاق هذه القائمة' : 'Toggle this shortcuts panel' },
+                  ].map((s, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-black/3 dark:hover:bg-white/3">
+                      <span className="text-sm">{s.desc}</span>
+                      <div className="flex gap-1">
+                        {s.keys.map((k, ki) => (
+                          <kbd key={ki} className="px-2 py-0.5 text-xs font-mono font-bold bg-black/8 dark:bg-white/8 border border-black/15 dark:border-white/15 rounded-md shadow-sm">{k}</kbd>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cart Operations */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">{isAr ? 'عمليات السلة' : 'Cart Operations'}</h4>
+                <div className="space-y-1">
+                  {[
+                    { keys: ['+'], desc: isAr ? 'زيادة كمية المنتج المحدد' : 'Increase selected item quantity' },
+                    { keys: ['-'], desc: isAr ? 'إنقاص كمية المنتج المحدد' : 'Decrease selected item quantity' },
+                    { keys: ['Del'], desc: isAr ? 'حذف المنتج المحدد من السلة' : 'Remove selected item from cart' },
+                  ].map((s, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-black/3 dark:hover:bg-white/3">
+                      <span className="text-sm">{s.desc}</span>
+                      <div className="flex gap-1">
+                        {s.keys.map((k, ki) => (
+                          <kbd key={ki} className="px-2 py-0.5 text-xs font-mono font-bold bg-black/8 dark:bg-white/8 border border-black/15 dark:border-white/15 rounded-md shadow-sm">{k}</kbd>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Checkout */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">{isAr ? 'إتمام البيع' : 'Checkout'}</h4>
+                <div className="space-y-1">
+                  {[
+                    { keys: ['F2'], desc: isAr ? 'فتح نافذة الدفع النقدي' : 'Open cash payment' },
+                    { keys: ['F3'], desc: isAr ? 'فتح نافذة البيع بالدين' : 'Open debt/credit payment' },
+                    { keys: ['F4'], desc: isAr ? 'فتح محوّل العملات' : 'Open currency converter' },
+                  ].map((s, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-black/3 dark:hover:bg-white/3">
+                      <span className="text-sm">{s.desc}</span>
+                      <div className="flex gap-1">
+                        {s.keys.map((k, ki) => (
+                          <kbd key={ki} className="px-2 py-0.5 text-xs font-mono font-bold bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20 rounded-md shadow-sm">{k}</kbd>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tip */}
+              <div className="text-[11px] text-gray-400 bg-black/3 dark:bg-white/3 rounded-xl p-3 border border-black/5 dark:border-white/5">
+                💡 {isAr
+                  ? 'نصيحة: يمكنك ضغط أزرار الكمية بدون التركيز على السلة — سيتم التطبيق تلقائياً على آخر منتج محدد.'
+                  : 'Tip: Quantity keys (+/-) work without clicking the cart — they apply to the last selected item automatically.'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCameraScanner && (
         <CameraScannerModal 
