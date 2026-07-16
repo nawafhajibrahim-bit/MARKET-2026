@@ -42,6 +42,14 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose })
       alert(isAr ? 'يرجى إدخال اسم المشترك ورقم الهاتف' : 'Please enter subscriber name and phone number');
       return;
     }
+    if (!reqPhone.startsWith('+')) {
+      alert(isAr ? 'الرجاء كتابة النداء الدولي قبل رقم الهاتف (مثال: +964)' : 'Please include the country code before the phone number (e.g. +964)');
+      return;
+    }
+    if (reqPhone.length < 8) {
+      alert(isAr ? 'رقم الهاتف المدخل غير صحيح' : 'Invalid phone number');
+      return;
+    }
     setReqLoading(true);
     try {
       const res = await fetch('/api/license-requests', {
@@ -202,13 +210,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose })
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">{isAr ? 'رقم الهاتف (للتواصل)' : 'Phone Number'}</label>
+                <label className="block text-sm font-medium mb-1">{isAr ? 'رقم الهاتف (مع النداء الدولي)' : 'Phone (with country code)'}</label>
                 <input 
                   type="tel"
                   required
                   value={reqPhone}
                   onChange={(e) => setReqPhone(e.target.value)}
-                  placeholder="e.g. 05XXXXX"
+                  placeholder="مثال: +96477000000"
                   className="w-full px-4 py-2.5 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all dir-ltr"
                 />
               </div>

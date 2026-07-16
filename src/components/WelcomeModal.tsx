@@ -153,8 +153,8 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
                         <h4 className="font-bold mb-1">{isAr ? 'نسخة تجريبية (Beta)' : 'Beta Version'}</h4>
                         <p className="text-sm opacity-90 leading-relaxed">
                           {isAr 
-                            ? 'هذا النظام ما زال قيد التطوير والاختبار. قد تواجه بعض الأخطاء أو التغييرات المستمرة. لا يتحمل المطور أي مسؤولية عن فقدان البيانات. شكراً لتفهمكم ودعمكم في تحسين النظام.'
-                            : 'This system is in active development (Beta). You may encounter bugs. The developer is not responsible for data loss. Thanks for your support!'}
+                            ? 'نظام إدارة المبيعات يوفر لك أدوات متكاملة ومستقرة لإدارة أعمالك بكفاءة عالية. نعمل باستمرار على تطوير النظام وإضافة ميزات جديدة لخدمتك بشكل أفضل. وبما أن النظام يخضع للتطوير المستمر، قد تواجه بعض الأخطاء الطفيفة، ونحن نعتمد على مقترحاتك لتحسين التجربة بشكل دائم.'
+                            : 'The system provides robust tools to manage your business efficiently. We are constantly adding new features. As the system undergoes continuous improvements, you might encounter minor bugs. We rely on your feedback to perfect the experience!'}
                         </p>
                       </div>
                     </div>

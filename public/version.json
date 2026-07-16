@@ -1,14 +1,14 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "release_date": "2026-07-16",
   "changelog_ar": [
+    "تحسين نموذج طلب الاشتراك لإلزام كتابة النداء الدولي في رقم الهاتف.",
     "إضافة ميزة تصدير البيانات إلى ملف إكسل (Excel).",
-    "تحسين واجهة شريط التنقل لتتناسب مع جميع الشاشات والأحجام.",
-    "إخفاء لوحة إدارة المشتركين للمستخدمين العاديين."
+    "تحسين واجهة شريط التنقل لتتناسب مع جميع الشاشات والأحجام."
   ],
   "changelog_en": [
+    "Improved subscription request form to enforce international phone codes.",
     "Added feature to export data to Excel (xlsx).",
-    "Responsive layout improvements for the top navigation bar.",
-    "Hidden subscriber management panel for normal users."
+    "Responsive layout improvements for the top navigation bar."
   ]
 }
