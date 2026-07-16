@@ -68,16 +68,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     try {
+        const getKvKey = (k: string) => k.startsWith('trial:') ? k : `license:${k}`;
+
         // 1. List action
         if (action === 'list') {
-            const keys = await kv.keys('license:*');
+            const licenseKeys = await kv.keys('license:*');
+            const trialKeys = await kv.keys('trial:*');
             const licenses: Record<string, any> = {};
             
-            for (const key of keys) {
+            for (const key of licenseKeys) {
                 const licenseKey = key.replace('license:', '');
-                const data = await kv.get(key);
+                const data: any = await kv.get(key);
                 if (data) {
-                    licenses[licenseKey] = data;
+                    licenses[licenseKey] = { ...data, type: 'license' };
+                }
+            }
+            for (const key of trialKeys) {
+                const data: any = await kv.get(key);
+                if (data) {
+                    // We keep the 'trial:' prefix as the ID in the frontend so we know how to save/delete it
+                    licenses[key] = { ...data, type: 'trial', merchant_name: 'تجربة مجانية', phone: '' };
                 }
             }
             return res.status(200).json({ success: true, licenses });
@@ -89,7 +99,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return res.status(400).json({ error: 'Missing license key' });
             }
             
-            const existingRecord: any = await kv.get(`license:${license_key}`);
+            const actualKey = getKvKey(license_key);
+            const existingRecord: any = await kv.get(actualKey);
             if (!existingRecord) {
                 return res.status(404).json({ error: 'License key not found' });
             }
@@ -99,7 +110,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 activated_devices: []
             };
             
-            await kv.set(`license:${license_key}`, updated);
+            await kv.set(actualKey, updated);
             return res.status(200).json({ success: true, message: 'Active devices cleared successfully' });
         }
 
@@ -109,8 +120,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return res.status(400).json({ error: 'Missing required fields (license_key, expiry_date, status)' });
             }
 
-            const existingRecord: any = (await kv.get(`license:${license_key}`)) || {};
+            const actualKey = getKvKey(license_key);
+            const existingRecord: any = (await kv.get(actualKey)) || {};
             const updatedRecord = {
+                ...existingRecord,
                 merchant_name: merchant_name || existingRecord.merchant_name || '',
                 phone: phone || existingRecord.phone || '',
                 expiry_date: expiry_date,
@@ -119,7 +132,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 activated_devices: existingRecord.activated_devices || []
             };
 
-            await kv.set(`license:${license_key}`, updatedRecord);
+            await kv.set(actualKey, updatedRecord);
             return res.status(200).json({ success: true, message: 'License updated successfully' });
         }
 
@@ -128,7 +141,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (!license_key) {
                 return res.status(400).json({ error: 'Missing license key' });
             }
-            await kv.del(`license:${license_key}`);
+            await kv.del(getKvKey(license_key));
             return res.status(200).json({ success: true, message: 'License deleted successfully' });
         }
 

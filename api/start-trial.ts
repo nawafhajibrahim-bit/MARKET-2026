@@ -31,6 +31,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         const now = new Date();
 
         if (existingTrial) {
+            if (existingTrial.status === 'suspended' || existingTrial.status === 'disabled') {
+                return res.status(403).json({ 
+                    active: false, 
+                    error: 'trial_suspended',
+                    message: existingTrial.status === 'suspended' ? 'الفترة التجريبية موقوفة' : 'الفترة التجريبية ملغاة'
+                });
+            }
+
             const expiryDate = new Date(existingTrial.expiry_date);
             if (now > expiryDate) {
                 return res.status(403).json({ 
@@ -45,11 +53,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             });
         }
 
-        // Start a fresh 14-day trial
-        const expiryDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days
+        // Start a fresh 365-day trial
+        const expiryDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 365 days
         const newTrial = {
             start_date: now.toISOString(),
-            expiry_date: expiryDate.toISOString()
+            expiry_date: expiryDate.toISOString(),
+            status: 'active'
         };
 
         await kv.set(trialKey, newTrial);

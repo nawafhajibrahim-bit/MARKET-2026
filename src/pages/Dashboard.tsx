@@ -6,7 +6,6 @@ import { useDb } from '../database/Provider';
 import type { InvoiceDocType, DebtDocType, ProductDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
 import { ZReportModal } from '../components/ZReportModal';
-import { WelcomeModal } from '../components/WelcomeModal';
 import { SubscriptionModal } from '../components/SubscriptionModal';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -419,8 +418,6 @@ export const Dashboard = () => {
         />
       )}
       
-      <WelcomeModal />
-
       {showSubscriptionModal && <SubscriptionModal onClose={() => setShowSubscriptionModal(false)} />}
     </div>
   );

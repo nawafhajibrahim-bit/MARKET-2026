@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb } from 'lucide-react';
+import { WelcomeModal } from './WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDb } from '../database/Provider';
 
@@ -12,6 +13,7 @@ export const Layout = () => {
   const db = useDb();
   const [sysConfig, setSysConfig] = useState<any>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [reqPhone, setReqPhone] = useState('');
   const [reqDuration, setReqDuration] = useState(3);
   const [reqLoading, setReqLoading] = useState(false);
@@ -22,6 +24,11 @@ export const Layout = () => {
       db.system_config.findOne('config').$.subscribe(doc => {
         if (doc) setSysConfig(doc.toJSON());
       });
+    }
+
+    const hasSeenWelcome = localStorage.getItem('has_seen_welcome_v2');
+    if (!hasSeenWelcome) {
+      setShowWelcomeModal(true);
     }
   }, [db]);
 
@@ -168,6 +175,15 @@ export const Layout = () => {
             </button>
           )}
 
+          <button
+            onClick={() => setShowWelcomeModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 rounded-lg font-bold text-sm transition-all cursor-pointer border border-blue-500/20"
+            title={i18n.language.startsWith('ar') ? 'التحديثات والمقترحات' : 'Updates & Feedback'}
+          >
+            <Lightbulb size={16} className="text-yellow-500" />
+            <span className="hidden sm:inline">{i18n.language.startsWith('ar') ? 'المقترحات' : 'Feedback'}</span>
+          </button>
+
           {/* User info */}
           {currentUser && (
             <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500">
@@ -309,6 +325,8 @@ export const Layout = () => {
           </div>
         </div>
       )}
+
+      <WelcomeModal isOpen={showWelcomeModal} onClose={() => setShowWelcomeModal(false)} />
     </div>
   );
 };

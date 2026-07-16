@@ -14,7 +14,11 @@ import {
   Users,
   Ban,
   UserCheck,
-  Trash2
+  Trash2,
+  MessageSquare,
+  Settings,
+  Star,
+  MessageCircle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -38,8 +42,17 @@ export const Admin = () => {
   const [licensesList, setLicensesList] = useState<Record<string, any>>({});
   
   // Tabs & Requests State
-  const [activeTab, setActiveTab] = useState<'licenses' | 'requests'>('licenses');
+  const [activeTab, setActiveTab] = useState<'licenses' | 'requests' | 'feedbacks' | 'settings'>('licenses');
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [devConfig, setDevConfig] = useState<any>({
+    show_beta_warning: true,
+    ads_title: '',
+    ads_text: '',
+    youtube_link: '',
+    telegram_link: '',
+    other_apps_link: ''
+  });
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,9 +76,67 @@ export const Admin = () => {
     if (adminSecret && isAuthenticatedOwner) {
       fetchLicensesList();
       fetchRequestsList();
+      fetchFeedbacks();
+      fetchDevConfig();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticatedOwner]);
+
+  const fetchFeedbacks = async () => {
+    try {
+      const res = await fetch('/api/developer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list-feedback', admin_secret: adminSecret })
+      });
+      const data = await res.json();
+      if (data.success) setFeedbacks(data.feedbacks);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchDevConfig = async () => {
+    try {
+      const res = await fetch('/api/developer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-config' })
+      });
+      const data = await res.json();
+      if (data.success && data.config) setDevConfig(data.config);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const saveDevConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/developer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save-config', admin_secret: adminSecret, config: devConfig })
+      });
+      if (res.ok) alert(isAr ? 'تم حفظ الإعدادات بنجاح!' : 'Settings saved successfully!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteFeedback = async (id: string) => {
+    if (!window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المقترح؟' : 'Are you sure you want to delete this feedback?')) return;
+    try {
+      await fetch('/api/developer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete-feedback', admin_secret: adminSecret, feedback_id: id })
+      });
+      fetchFeedbacks();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const generateLicense = () => {
     return 'SM-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
@@ -656,6 +727,26 @@ export const Admin = () => {
             </span>
           )}
         </button>
+        <button
+          onClick={() => { setActiveTab('feedbacks'); fetchFeedbacks(); }}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors relative ${
+            activeTab === 'feedbacks'
+              ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          {isAr ? 'آراء العملاء' : 'Feedback'}
+        </button>
+        <button
+          onClick={() => { setActiveTab('settings'); fetchDevConfig(); }}
+          className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors relative ${
+            activeTab === 'settings'
+              ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+          }`}
+        >
+          {isAr ? 'إعدادات المطور' : 'Dev Settings'}
+        </button>
       </div>
 
       {activeTab === 'licenses' && (
@@ -785,6 +876,11 @@ export const Admin = () => {
                               <span className="bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-lg text-gray-700 dark:text-gray-300 font-semibold border border-black/5 dark:border-white/5 select-all">
                                 {key}
                               </span>
+                              {value.type === 'trial' && (
+                                <span className="bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded text-[10px] font-bold shrink-0">
+                                  {isAr ? 'تجريبي' : 'Trial'}
+                                </span>
+                              )}
                               <button
                                 onClick={() => copyToClipboard(key)}
                                 className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg active:scale-95 transition-all text-gray-500 cursor-pointer"
@@ -966,6 +1062,161 @@ export const Admin = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* FEEDBACKS TAB */}
+      {activeTab === 'feedbacks' && (
+        <div className="bg-white dark:bg-[#1f2028] p-6 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex items-center justify-between mb-6 border-b border-black/5 dark:border-white/5 pb-4">
+            <h2 className="text-xl font-bold text-[var(--color-primary)] flex items-center gap-2">
+              <MessageSquare size={24} />
+              {isAr ? 'آراء واقتراحات العملاء' : 'Customer Feedback'}
+            </h2>
+            <button onClick={fetchFeedbacks} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors">
+              <RefreshCw size={20} />
+            </button>
+          </div>
+
+          {feedbacks.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              <MessageCircle size={48} className="mx-auto mb-4 opacity-20" />
+              <p>{isAr ? 'لا توجد مقترحات أو آراء حتى الآن' : 'No feedback yet'}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {feedbacks.map(fb => (
+                <div key={fb.id} className="bg-black/5 dark:bg-white/5 p-4 rounded-xl border border-transparent hover:border-black/10 dark:hover:border-white/10 transition-all">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star key={star} size={16} className={star <= fb.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} />
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-500">{new Date(fb.date).toLocaleDateString(isAr ? 'ar-SA' : 'en-US')}</span>
+                  </div>
+                  <p className="font-medium mb-4 whitespace-pre-wrap">{fb.message}</p>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-black/5 dark:border-white/5 mt-auto">
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      <div>👤 {fb.name}</div>
+                      {fb.phone && <div>📞 {fb.phone}</div>}
+                    </div>
+                    <div className="flex gap-2">
+                      {fb.phone && (
+                        <a 
+                          href={`https://wa.me/${fb.phone.replace(/^0+/, '')}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-bold transition-colors"
+                        >
+                          {isAr ? 'واتساب' : 'WhatsApp'}
+                        </a>
+                      )}
+                      <button 
+                        onClick={() => deleteFeedback(fb.id)}
+                        className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 rounded-lg transition-colors"
+                        title={isAr ? 'حذف المقترح' : 'Delete'}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SETTINGS TAB */}
+      {activeTab === 'settings' && (
+        <div className="bg-white dark:bg-[#1f2028] p-6 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex items-center gap-2 mb-6 border-b border-black/5 dark:border-white/5 pb-4">
+            <Settings size={24} className="text-[var(--color-primary)]" />
+            <h2 className="text-xl font-bold text-[var(--color-primary)]">{isAr ? 'إعدادات واجهة العملاء' : 'Client Interface Settings'}</h2>
+          </div>
+
+          <form onSubmit={saveDevConfig} className="space-y-6 max-w-2xl">
+            <div className="flex items-center gap-3 bg-orange-50 dark:bg-orange-900/10 p-4 rounded-xl border border-orange-200 dark:border-orange-900/30">
+              <input 
+                type="checkbox" 
+                id="show_beta"
+                checked={devConfig.show_beta_warning}
+                onChange={(e) => setDevConfig({...devConfig, show_beta_warning: e.target.checked})}
+                className="w-5 h-5 accent-[var(--color-primary)]"
+              />
+              <label htmlFor="show_beta" className="font-bold text-orange-800 dark:text-orange-300 cursor-pointer">
+                {isAr ? 'عرض تنبيه النسخة التجريبية (Beta) للعملاء' : 'Show Beta Warning to clients'}
+              </label>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-bold text-lg border-b border-black/5 dark:border-white/5 pb-2">{isAr ? 'قسم التحديثات' : 'Updates Section'}</h3>
+              
+              <div>
+                <label className="block font-medium mb-1">{isAr ? 'عنوان التحديثات' : 'Updates Title'}</label>
+                <input 
+                  type="text"
+                  value={devConfig.ads_title}
+                  onChange={(e) => setDevConfig({...devConfig, ads_title: e.target.value})}
+                  className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] rounded-xl outline-none"
+                  placeholder={isAr ? 'مثال: التحديثات الأخيرة' : 'e.g. Latest Updates'}
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1">{isAr ? 'تفاصيل التحديثات أو الإعلان' : 'Updates Details or Ad'}</label>
+                <textarea 
+                  value={devConfig.ads_text}
+                  onChange={(e) => setDevConfig({...devConfig, ads_text: e.target.value})}
+                  className="w-full p-4 bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] rounded-xl outline-none min-h-[120px]"
+                  placeholder={isAr ? 'اكتب تفاصيل الميزات الجديدة هنا...' : 'Write updates here...'}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-bold text-lg border-b border-black/5 dark:border-white/5 pb-2">{isAr ? 'الروابط المهمة' : 'Important Links'}</h3>
+              
+              <div>
+                <label className="block font-medium mb-1 text-red-500">{isAr ? 'رابط قناة اليوتيوب (شروحات)' : 'YouTube Tutorial Link'}</label>
+                <input 
+                  type="url"
+                  value={devConfig.youtube_link}
+                  onChange={(e) => setDevConfig({...devConfig, youtube_link: e.target.value})}
+                  className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-transparent focus:border-red-500 rounded-xl outline-none dir-ltr text-left"
+                  placeholder="https://youtube.com/..."
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-blue-500">{isAr ? 'رابط قناة التليجرام' : 'Telegram Channel Link'}</label>
+                <input 
+                  type="url"
+                  value={devConfig.telegram_link}
+                  onChange={(e) => setDevConfig({...devConfig, telegram_link: e.target.value})}
+                  className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-transparent focus:border-blue-500 rounded-xl outline-none dir-ltr text-left"
+                  placeholder="https://t.me/..."
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1 text-[var(--color-primary)]">{isAr ? 'رابط برامجنا الأخرى' : 'Other Apps Link'}</label>
+                <input 
+                  type="url"
+                  value={devConfig.other_apps_link}
+                  onChange={(e) => setDevConfig({...devConfig, other_apps_link: e.target.value})}
+                  className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] rounded-xl outline-none dir-ltr text-left"
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="px-6 py-3 bg-[var(--color-primary)] text-white font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all w-full sm:w-auto">
+              {isAr ? 'حفظ التعديلات' : 'Save Settings'}
+            </button>
+          </form>
         </div>
       )}
 
