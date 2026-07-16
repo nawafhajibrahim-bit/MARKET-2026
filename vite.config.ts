@@ -13,6 +13,9 @@ export default defineConfig({
       devOptions: {
         enabled: false
       },
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5000000
+      },
       manifest: {
         name: 'Smart Market MS',
         short_name: 'SmartMarket',

@@ -108,16 +108,20 @@ export const Layout = () => {
     { path: '/sales-history', label: t('sales_history'), icon: FileText, roles: ['admin', 'manager', 'cashier'] },
     { path: '/debts', label: t('debts_nav'), icon: HandCoins, roles: ['admin', 'manager', 'cashier'] },
     { path: '/settings', label: t('settings'), icon: SettingsIcon, roles: ['admin', 'manager'] },
-    { path: '/admin', label: t('subscriber_mgmt'), icon: ShieldCheck, roles: ['admin'] },
+    { path: '/admin', label: t('subscriber_mgmt'), icon: ShieldCheck, roles: ['developer_only'] },
   ];
 
   const userRole = currentUser?.role || 'cashier';
-  const navItems = allNavItems.filter(item => item.roles.includes(userRole));
+  const isDeveloperUser = currentUser?.username === 'developer';
+  const navItems = allNavItems.filter(item => {
+    if (item.path === '/admin') return isDeveloperUser;
+    return item.roles.includes(userRole);
+  });
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors duration-200">
-      <header className="sticky top-0 z-50 flex justify-between items-center bg-white/5 backdrop-blur-md p-4 border-b border-black/5 dark:border-white/5">
-        <div className="flex items-center gap-4">
+      <header className="sticky top-0 z-50 flex flex-wrap justify-between items-center bg-white/5 backdrop-blur-md p-4 border-b border-black/5 dark:border-white/5 gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-xl font-bold text-[var(--color-primary)]">
             {t('app_name')}
           </h1>
@@ -136,13 +140,13 @@ export const Layout = () => {
           )}
 
           {currentBranch && availableBranches.length <= 1 && (
-            <span className="hidden lg:flex items-center gap-1 text-xs text-gray-500">
+            <span className="hidden lg:flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap">
               <Store size={12} />
               {currentBranch.name}
             </span>
           )}
 
-          <nav className="hidden md:flex gap-1">
+          <nav className="hidden md:flex flex-wrap gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -164,7 +168,7 @@ export const Layout = () => {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {isTrial && isAdmin && (
             <button
               onClick={() => setShowUpgradeModal(true)}

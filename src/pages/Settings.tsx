@@ -11,6 +11,7 @@ import { hashPassword as secureHashPassword, generateSalt } from '../services/pa
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_VERSION } from '../utils/version';
 import { SubscriptionModal } from '../components/SubscriptionModal';
+import * as XLSX from 'xlsx';
 import {
   isFolderBackupSupported,
   isFolderBackupEnabled,
@@ -409,6 +410,65 @@ export const Settings = () => {
       a.download = `smartmarket_backup_${new Date().toISOString().split('T')[0]}.zip`;
       a.click();
       URL.revokeObjectURL(url);
+      setLocalBackupStatus('success');
+      setTimeout(() => setLocalBackupStatus('idle'), 3000);
+    } catch (err) {
+      console.error(err);
+      setLocalBackupStatus('error');
+      setTimeout(() => setLocalBackupStatus('idle'), 3000);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setLocalBackupStatus('loading');
+    try {
+      const productsDocs = await db.products.find().exec();
+      const debtsDocs = await db.debts.find().exec();
+      const invoicesDocs = await db.invoices.find().exec();
+      
+      const products = productsDocs.map(d => d.toJSON());
+      const debts = debtsDocs.map(d => {
+          const json = d.toJSON();
+          return {
+              'المعرف': json.debt_id,
+              'الاسم': json.client_supplier_name,
+              'رقم الهاتف': json.phone,
+              'النوع': json.type,
+              'المبلغ الإجمالي': json.amount,
+              'المبلغ المدفوع': json.paid_amount,
+              'تاريخ الاستحقاق': json.due_date,
+              'الحالة': json.status
+          };
+      });
+      const simplifiedInvoices = invoicesDocs.map(d => {
+          const json = d.toJSON();
+          return {
+              'رقم الفاتورة': json.invoice_id,
+              'التاريخ': new Date(json.timestamp).toLocaleString(),
+              'المبلغ الإجمالي': json.total_amount,
+              'العملة': json.currency,
+              'طريقة الدفع': json.payment_type,
+              'الربح': json.actual_profit,
+              'الخصم': json.discount_amount
+          };
+      });
+
+      const wb = XLSX.utils.book_new();
+
+      const wsProducts = XLSX.utils.json_to_sheet(products.length ? products : [{Message: "لا يوجد بيانات"}]);
+      const wsDebts = XLSX.utils.json_to_sheet(debts.length ? debts : [{Message: "لا يوجد بيانات"}]);
+      const wsInvoices = XLSX.utils.json_to_sheet(simplifiedInvoices.length ? simplifiedInvoices : [{Message: "لا يوجد بيانات"}]);
+
+      wsProducts['!dir'] = 'rtl';
+      wsDebts['!dir'] = 'rtl';
+      wsInvoices['!dir'] = 'rtl';
+
+      XLSX.utils.book_append_sheet(wb, wsProducts, "المنتجات (Products)");
+      XLSX.utils.book_append_sheet(wb, wsDebts, "الديون (Debts)");
+      XLSX.utils.book_append_sheet(wb, wsInvoices, "المبيعات (Sales)");
+
+      XLSX.writeFile(wb, `SmartMarket_Data_${new Date().toISOString().split('T')[0]}.xlsx`);
+
       setLocalBackupStatus('success');
       setTimeout(() => setLocalBackupStatus('idle'), 3000);
     } catch (err) {
@@ -891,7 +951,7 @@ export const Settings = () => {
                 <p className="text-sm text-gray-500 mb-4">{t('local_backup_desc')}</p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-black/5 dark:border-white/5">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-black/5 dark:border-white/5 flex-wrap">
                 <button 
                     onClick={handleLocalExport}
                     disabled={localBackupStatus === 'loading'}
@@ -900,7 +960,15 @@ export const Settings = () => {
                     <Download size={18} /> {t('export_backup_btn')}
                 </button>
 
-                <div className="flex-1 relative">
+                <button 
+                    onClick={handleExportExcel}
+                    disabled={localBackupStatus === 'loading'}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold rounded-xl active:scale-95 disabled:opacity-50 transition-all cursor-pointer text-center"
+                >
+                    <Download size={18} /> {isAr ? 'تصدير إكسل (Excel)' : 'Export Excel'}
+                </button>
+
+                <div className="flex-1 relative min-w-[200px]">
                     <input 
                         type="file" 
                         accept=".zip" 

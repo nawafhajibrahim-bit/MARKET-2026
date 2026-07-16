@@ -1,14 +1,14 @@
 {
-  "version": "1.4.2",
-  "release_date": "2026-07-05",
+  "version": "1.4.3",
+  "release_date": "2026-07-16",
   "changelog_ar": [
-    "إضافة دعم وحدات القياس المتعددة (الكيلوغرام، اللتر، إلخ) عند إدخال وبيع المواد.",
-    "إتاحة زر البحث اليدوي عن التحديثات وتصفح سجل التغييرات الجديد.",
-    "تحسينات عامة على واجهة نقطة البيع لتعمل بسلاسة أكبر."
+    "إضافة ميزة تصدير البيانات إلى ملف إكسل (Excel).",
+    "تحسين واجهة شريط التنقل لتتناسب مع جميع الشاشات والأحجام.",
+    "إخفاء لوحة إدارة المشتركين للمستخدمين العاديين."
   ],
   "changelog_en": [
-    "Added support for multi-units (Kilogram, Liter, etc.) in POS and Inventory.",
-    "Introduced manual check for updates button and release notes viewer.",
-    "General UI improvements in POS screen."
+    "Added feature to export data to Excel (xlsx).",
+    "Responsive layout improvements for the top navigation bar.",
+    "Hidden subscriber management panel for normal users."
   ]
 }
