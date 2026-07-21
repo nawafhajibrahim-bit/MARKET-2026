@@ -53,8 +53,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             });
         }
 
-        // Start a fresh 365-day trial
-        const expiryDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // 365 days
+        // Start a fresh 14-day trial
+        const expiryDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days
         const newTrial = {
             start_date: now.toISOString(),
             expiry_date: expiryDate.toISOString(),
