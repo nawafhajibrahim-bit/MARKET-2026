@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Send, AlertTriangle, HelpCircle, Star, ExternalLink, PlayCircle, CheckCircle, HardDrive, Laptop, Bot, Download } from 'lucide-react';
+import { X, Send, AlertTriangle, HelpCircle, Star, ExternalLink, PlayCircle, CheckCircle, HardDrive, Laptop, Bot, Download, MessageCircle } from 'lucide-react';
 // I'll import Telegram differently since Send is already imported
 import { Send as Telegram } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -277,6 +277,14 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
                     </div>
                   ) : (
                     <form onSubmit={handleSubmitFeedback} className="space-y-5">
+                      <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-xl flex flex-col sm:flex-row items-center justify-center gap-2 text-green-700 dark:text-green-400 font-medium text-sm text-center">
+                        <div className="flex items-center gap-2">
+                          <MessageCircle size={18} />
+                          <span>{isAr ? 'للتواصل السريع عبر واتساب:' : 'For quick support via WhatsApp:'}</span>
+                        </div>
+                        <a href="https://wa.me/96407510171376" target="_blank" rel="noreferrer" className="font-bold underline hover:text-green-600" dir="ltr">00964 075 1017 1376</a>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-bold mb-2 text-center">{isAr ? 'ما هو تقييمك للبرنامج؟' : 'How do you rate the app?'}</label>
                         <div className="flex justify-center gap-2 mb-2">

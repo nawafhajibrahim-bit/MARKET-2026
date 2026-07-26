@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb, MessageCircle } from 'lucide-react';
 import { WelcomeModal } from './WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDb } from '../database/Provider';
@@ -187,6 +187,17 @@ export const Layout = () => {
             <Lightbulb size={16} className="text-yellow-500" />
             <span className="hidden sm:inline">{i18n.language.startsWith('ar') ? 'المقترحات' : 'Feedback'}</span>
           </button>
+
+          <a
+            href="https://wa.me/96407510171376"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-600 rounded-lg font-bold text-sm transition-all cursor-pointer border border-green-500/20"
+            title={i18n.language.startsWith('ar') ? 'تواصل معنا عبر واتساب' : 'Contact via WhatsApp'}
+          >
+            <MessageCircle size={16} className="text-green-500" />
+            <span className="hidden sm:inline">{i18n.language.startsWith('ar') ? 'الدعم' : 'Support'}</span>
+          </a>
 
           {/* User info */}
           {currentUser && (
