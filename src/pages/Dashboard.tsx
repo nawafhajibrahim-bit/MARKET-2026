@@ -301,6 +301,13 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* AI Smart Assistant - Moved to top for better visibility */}
+      {aiEnabled && (
+        <React.Suspense fallback={<div className="p-4 text-center">{t('ai_loading')}</div>}>
+          <AIEngine />
+        </React.Suspense>
+      )}
+
       {/* Alerts row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {stats.lowStockCount > 0 && (
@@ -403,13 +410,6 @@ export const Dashboard = () => {
           </div>
         </div>
       )}
-
-      {aiEnabled && (
-        <React.Suspense fallback={<div className="p-4 text-center">{t('ai_loading')}</div>}>
-          <AIEngine />
-        </React.Suspense>
-      )}
-
       {showZReport && (
         <ZReportModal
           invoices={data.invoices}
