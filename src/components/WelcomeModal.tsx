@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Send, AlertTriangle, HelpCircle, Star, ExternalLink, PlayCircle, CheckCircle } from 'lucide-react';
+import { X, Send, AlertTriangle, HelpCircle, Star, ExternalLink, PlayCircle, CheckCircle, HardDrive, Laptop, Bot, Download } from 'lucide-react';
 // I'll import Telegram differently since Send is already imported
 import { Send as Telegram } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -12,7 +13,8 @@ interface WelcomeModalProps {
 export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
   const { i18n } = useTranslation();
   const isAr = i18n.language.startsWith('ar');
-  const [activeTab, setActiveTab] = useState<'updates' | 'feedback'>('updates');
+  const [activeTab, setActiveTab] = useState<'instructions' | 'updates' | 'feedback'>('instructions');
+  const [dontShowAgain, setDontShowAgain] = useState(false);
   const [loading, setLoading] = useState(true);
   
   const [config, setConfig] = useState({
@@ -35,12 +37,6 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    
-    // Check if auto-opened
-    const hasSeenWelcome = localStorage.getItem('has_seen_welcome_v2');
-    if (!hasSeenWelcome) {
-      localStorage.setItem('has_seen_welcome_v2', 'true');
-    }
 
     const fetchConfig = async () => {
       try {
@@ -122,16 +118,22 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
+        <div className="flex border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5 overflow-x-auto whitespace-nowrap scrollbar-hide">
+          <button
+            onClick={() => setActiveTab('instructions')}
+            className={`flex-1 min-w-[120px] py-3 px-4 text-sm font-bold transition-colors ${activeTab === 'instructions' ? 'bg-white dark:bg-[#1f2028] text-[var(--color-primary)] border-t-2 border-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
+            {isAr ? 'ℹ️ تعليمات هامة' : 'ℹ️ Instructions'}
+          </button>
           <button
             onClick={() => setActiveTab('updates')}
-            className={`flex-1 py-3 text-sm font-bold transition-colors ${activeTab === 'updates' ? 'bg-white dark:bg-[#1f2028] text-[var(--color-primary)] border-t-2 border-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            className={`flex-1 min-w-[120px] py-3 px-4 text-sm font-bold transition-colors ${activeTab === 'updates' ? 'bg-white dark:bg-[#1f2028] text-[var(--color-primary)] border-t-2 border-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
           >
             {isAr ? '🚀 التحديثات' : '🚀 Updates'}
           </button>
           <button
             onClick={() => setActiveTab('feedback')}
-            className={`flex-1 py-3 text-sm font-bold transition-colors ${activeTab === 'feedback' ? 'bg-white dark:bg-[#1f2028] text-[var(--color-primary)] border-t-2 border-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            className={`flex-1 min-w-[120px] py-3 px-4 text-sm font-bold transition-colors ${activeTab === 'feedback' ? 'bg-white dark:bg-[#1f2028] text-[var(--color-primary)] border-t-2 border-[var(--color-primary)]' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
           >
             {isAr ? '💡 اقترح ميزة' : '💡 Suggestion / Feedback'}
           </button>
@@ -144,6 +146,73 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
             </div>
           ) : (
             <>
+              {activeTab === 'instructions' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30 p-4 rounded-xl flex gap-3 items-start text-orange-800 dark:text-orange-300">
+                    <HardDrive size={24} className="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold mb-1">{isAr ? 'تفعيل النسخة الاحتياطية (مهم جداً)' : 'Enable Backup (Very Important)'}</h4>
+                      <p className="text-sm opacity-90 leading-relaxed mb-2">
+                        {isAr 
+                          ? 'نرجو تحديد مجلد على قرص غير قرص النظام (مثلاً D أو E) ليتم حفظ النسخ الاحتياطية فيه بشكل دوري، ويُفضل ربطه بـ Google Drive للحصول على أمان أفضل.'
+                          : 'Please select a folder on a non-system drive (e.g. D or E) to save backups. It is highly recommended to sync this folder with Google Drive for better data security.'}
+                      </p>
+                      <Link to="/settings" onClick={onClose} className="inline-block mt-1 text-sm font-bold underline hover:text-orange-600 dark:hover:text-orange-200">
+                        {isAr ? 'الذهاب للإعدادات لتحديد المجلد' : 'Go to Settings to select folder'}
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 p-4 rounded-xl flex gap-3 items-start text-red-800 dark:text-red-300">
+                    <AlertTriangle size={24} className="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold mb-1">{isAr ? 'تحذير مسح بيانات المتصفح' : 'Warning: Clear Browsing Data'}</h4>
+                      <p className="text-sm opacity-90 leading-relaxed">
+                        {isAr 
+                          ? 'البيانات تُحفظ محلياً في المتصفح. لا تقم بمسح بيانات المتصفح (Clear Browsing Data / Cache) أبداً لكي لا تفقد بيانات محلك والفواتير!'
+                          : 'Data is saved locally in the browser. NEVER clear your browser data or cache, or you will lose your shop data and invoices!'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 p-4 rounded-xl flex gap-3 items-start text-blue-800 dark:text-blue-300">
+                    <Laptop size={24} className="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold mb-1">{isAr ? 'جهاز واحد فقط' : 'Single Device Only'}</h4>
+                      <p className="text-sm opacity-90 leading-relaxed">
+                        {isAr 
+                          ? 'البرنامج حالياً يعمل على جهاز واحد فقط (محلياً) ولا يدعم العمل على عدة أجهزة في نفس الوقت. استخدام نفس الحساب على متصفح آخر سيعتبر جهازاً منفصلاً.'
+                          : 'The program currently works on a single device locally and does not support simultaneous multi-device usage.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-900/30 p-4 rounded-xl flex gap-3 items-start text-purple-800 dark:text-purple-300">
+                    <Bot size={24} className="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold mb-1">{isAr ? 'تفعيل الذكاء الاصطناعي' : 'Enable AI Assistant'}</h4>
+                      <p className="text-sm opacity-90 leading-relaxed">
+                        {isAr 
+                          ? 'للحصول على تجربة أفضل وإحصائيات متقدمة، يرجى تفعيل مفتاح الذكاء الاصطناعي (Groq AI) من صفحة الإعدادات مجاناً.'
+                          : 'For a better experience, please enable the Groq AI key from the settings page for free.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30 p-4 rounded-xl flex gap-3 items-start text-emerald-800 dark:text-emerald-300">
+                    <Download size={24} className="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold mb-1">{isAr ? 'تثبيت البرنامج كتطبيق (PWA)' : 'Install as App (PWA)'}</h4>
+                      <p className="text-sm opacity-90 leading-relaxed">
+                        {isAr 
+                          ? 'يُفضل تثبيت البرنامج كتطبيق مستقل على جهازك ليعمل بشكل أسرع. يمكنك ذلك عبر الضغط على أيقونة التثبيت ⬇️ في شريط عنوان المتصفح في الأعلى (يُنصح باستخدام متصفح Google Chrome لضمان ظهور هذه الأيقونة).'
+                          : 'It is recommended to install the program as a standalone app. Click the install icon in the address bar (Google Chrome is recommended to see this option).'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'updates' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                   {config.show_beta_warning && (
@@ -284,6 +353,30 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
             </>
           )}
         </div>
+        
+        <div className="p-4 border-t border-black/10 dark:border-white/10 bg-gray-50 dark:bg-black/20 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+            <input 
+              type="checkbox" 
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+              className="w-4 h-4 rounded text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+            />
+            {isAr ? 'لا تظهر هذه الواجهة مرة أخرى' : 'Do not show this again'}
+          </label>
+          <button 
+            onClick={() => {
+              if (dontShowAgain) {
+                localStorage.setItem('has_seen_welcome_v3', 'true');
+              }
+              onClose();
+            }}
+            className="px-6 py-2.5 bg-[var(--color-primary)] text-white font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all w-full sm:w-auto text-center shadow-md shadow-[var(--color-primary)]/20"
+          >
+            {isAr ? 'حسناً، فهمت' : 'Got it'}
+          </button>
+        </div>
+
       </div>
     </div>
   );

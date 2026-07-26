@@ -1,16 +1,65 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Sparkles, Send, BrainCircuit, AlertCircle, X } from 'lucide-react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Sparkles, Send, BrainCircuit, AlertCircle, X, Mic, MicOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDb } from '../../database/Provider';
 
 export default function AIEngine() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const db = useDb();
   const [query, setQuery] = useState('');
   const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAiWarning, setShowAiWarning] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert(i18n.language.startsWith('ar') ? 'متصفحك لا يدعم ميزة التحدث بالصوت.' : 'Your browser does not support speech recognition.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = i18n.language.startsWith('ar') ? 'ar-SA' : 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => setIsRecording(true);
+    
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setQuery(prev => prev + (prev ? ' ' : '') + finalTranscript);
+      }
+    };
+
+    recognition.onerror = (e: any) => {
+      console.error(e);
+      setIsRecording(false);
+    };
+    
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+    
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   useEffect(() => {
     const hasKey = !!localStorage.getItem('custom_groq_key');
@@ -172,13 +221,29 @@ ${dbContext}
           <div className="flex-grow flex items-start gap-3">
             <AlertCircle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-1.5">
-              <p className="leading-relaxed">{t('ai_shared_key_warning')}</p>
-              <Link 
-                to="/settings" 
-                className="inline-flex items-center gap-1 font-bold text-xs text-[var(--color-primary)] hover:underline"
-              >
-                {t('i18n_language')?.startsWith?.('ar') ? 'الانتقال إلى الإعدادات لمشاهدة طريقة إضافة مفتاحك الخاص 👈' : 'Go to Settings to see how to add your own key 👈'}
-              </Link>
+              <p className="leading-relaxed font-bold">
+                {i18n.language.startsWith('ar') 
+                  ? 'مفتاح الذكاء الاصطناعي مفقود!' 
+                  : 'AI Key is missing!'}
+              </p>
+              <p className="leading-relaxed text-xs opacity-90">
+                {i18n.language.startsWith('ar') 
+                  ? 'لكي تتمكن من استخدام ميزة الذكاء الاصطناعي، يرجى الانتقال إلى الإعدادات وإضافة مفتاح Groq مجاناً بخطوات بسيطة مشروحة هناك.' 
+                  : 'To use the AI feature, please go to Settings and add a free Groq key using the simple steps provided there.'}
+              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
+                <Link 
+                  to="/settings" 
+                  className="inline-flex items-center gap-1 font-bold text-[var(--color-primary)] hover:underline bg-[var(--color-primary)]/10 px-3 py-1.5 rounded-lg w-fit"
+                >
+                  {i18n.language.startsWith('ar') ? 'انتقل للإعدادات لتفعيل المفتاح 👈' : 'Go to Settings 👈'}
+                </Link>
+                <span className="text-xs opacity-80 mt-1 sm:mt-0 font-medium bg-black/5 dark:bg-white/5 px-2 py-1.5 rounded-lg">
+                  {i18n.language.startsWith('ar') 
+                    ? 'أو تواصل معنا للمساعدة عبر الواتساب/تليجرام: 009647510171376' 
+                    : 'Or contact us via WhatsApp/Telegram: 009647510171376'}
+                </span>
+              </div>
             </div>
           </div>
           <button 
@@ -198,19 +263,30 @@ ${dbContext}
             <Sparkles size={18} className="text-blue-500" />
             {t('db_search_title')}
           </h4>
-          <form onSubmit={handleQuery} className="relative">
-            <input 
-              type="text" 
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={t('db_search_placeholder')} 
-              disabled={showAiWarning}
-              className="w-full pl-4 pr-12 py-3 rounded-lg bg-white dark:bg-[#1f2028] shadow-sm border border-transparent focus:border-blue-500 outline-none transition-all disabled:opacity-50"
-            />
+          <form onSubmit={handleQuery} className="relative flex items-center gap-2">
+            <div className="relative flex-1">
+              <input 
+                type="text" 
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={isRecording ? (i18n.language.startsWith('ar') ? 'جاري الاستماع...' : 'Listening...') : t('db_search_placeholder')} 
+                disabled={showAiWarning}
+                className="w-full pl-4 pr-12 py-3 rounded-lg bg-white dark:bg-[#1f2028] shadow-sm border border-transparent focus:border-blue-500 outline-none transition-all disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={toggleRecording}
+                disabled={showAiWarning}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${isRecording ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-500/10'}`}
+                title={i18n.language.startsWith('ar') ? 'تحدث بالصوت' : 'Speak'}
+              >
+                {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+            </div>
             <button 
               type="submit" 
               disabled={loading || !query || showAiWarning}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+              className="p-3 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-blue-500/20"
             >
               <Send size={18} />
             </button>

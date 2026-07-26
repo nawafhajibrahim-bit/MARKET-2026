@@ -26,7 +26,7 @@ export const Layout = () => {
       });
     }
 
-    const hasSeenWelcome = localStorage.getItem('has_seen_welcome_v2');
+    const hasSeenWelcome = localStorage.getItem('has_seen_welcome_v3');
     if (!hasSeenWelcome) {
       setShowWelcomeModal(true);
     }
