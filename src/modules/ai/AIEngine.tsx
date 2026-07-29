@@ -12,6 +12,7 @@ export default function AIEngine() {
   const [loading, setLoading] = useState(false);
   const [showAiWarning, setShowAiWarning] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
   const recognitionRef = useRef<any>(null);
 
   const toggleRecording = () => {
@@ -71,7 +72,7 @@ export default function AIEngine() {
     localStorage.setItem('dismiss_ai_warning', 'true');
   };
 
-  const fetchGroq = useCallback(async (prompt: string) => {
+  const fetchGroq = useCallback(async (messages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
     const customKey = localStorage.getItem('custom_groq_key') || '';
     let selectedModel = localStorage.getItem('ai_model') || 'llama-3.1-8b-instant';
     if (selectedModel === 'llama3-8b-8192') {
@@ -96,8 +97,8 @@ export default function AIEngine() {
         },
         body: JSON.stringify({
           model: selectedModel,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.5
+          messages,
+          temperature: 0.3
         })
       });
 
@@ -113,7 +114,7 @@ export default function AIEngine() {
       console.error(e);
       return t('ai_error_connect');
     }
-  }, [t, db]);
+  }, [t]);
 
   const getDatabaseContext = useCallback(async () => {
     try {
@@ -127,35 +128,61 @@ export default function AIEngine() {
       const invoices = invoiceDocs.map(d => d.toJSON());
       const debts = debtDocs.map(d => d.toJSON());
 
-      const productsSummary = products.map(p => 
-        `- ${p.name_ar} (${p.name_en || ''}): كود=${p.barcode}، سعر البيع=${p.sale_price}، التكلفة=${p.cost_price}، الكمية المتبقية=${p.stock_quantity}، الحد الأدنى=${p.min_safety_stock}`
-      ).join('\n');
-
-      const invoicesSummary = invoices.map(inv => {
-        const itemDetails = (inv.items || []).map((item: { product_id: string; unit_used: string; quantity: number; price: number }) => {
+      // Pre-calculate sales data
+      const productSalesMap: Record<string, { qty: number; profit: number }> = {};
+      invoices.forEach(inv => {
+        (inv.items || []).forEach((item: any) => {
           const prod = products.find(p => p.id === item.product_id);
-          const name = prod ? prod.name_ar : item.product_id;
-          return `${item.quantity}x ${name} (${item.unit_used}) بسعر ${item.price}`;
-        }).join(', ');
-        return `- فاتورة ${inv.invoice_id} في ${new Date(inv.timestamp).toLocaleDateString()}: المجموع=${inv.total_amount}، الربح=${inv.actual_profit || 0}، طريقة الدفع=${inv.payment_type}، المواد=[${itemDetails}]`;
-      }).join('\n');
+          const pId = prod ? prod.id : item.product_id;
+          if (!pId) return;
+          if (!productSalesMap[pId]) productSalesMap[pId] = { qty: 0, profit: 0 };
+          const q = Number(item.quantity) || 0;
+          const p = Number(item.price) || 0;
+          const c = prod ? (Number(prod.cost_price) || 0) : 0;
+          productSalesMap[pId].qty += q;
+          productSalesMap[pId].profit += q * (p - c);
+        });
+      });
 
-      const debtsSummary = debts.map(d => 
-        `- دين لـ ${d.client_supplier_name}: المبلغ=${d.amount}، المدفوع=${d.paid_amount || 0}، المتبقي=${d.amount - (d.paid_amount || 0)}، الحالة=${d.status}`
+      const analytics = products.map(p => ({
+        ...p,
+        totalQty: productSalesMap[p.id]?.qty || 0,
+        totalProfit: productSalesMap[p.id]?.profit || 0
+      }));
+
+      const topByQty = [...analytics].sort((a, b) => b.totalQty - a.totalQty).filter(p => p.totalQty > 0);
+      const topByProfit = [...analytics].sort((a, b) => b.totalProfit - a.totalProfit).filter(p => p.totalProfit > 0);
+      const lowStock = analytics.filter(p => p.stock_quantity <= (p.min_safety_stock || 0));
+
+      const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
+      const totalProfit = invoices.reduce((sum, inv) => sum + (Number(inv.actual_profit) || 0), 0);
+      
+      const pendingDebts = debts.filter(d => d.status !== 'Paid');
+      const debtAmount = pendingDebts.reduce((sum, d) => sum + ((Number(d.amount) || 0) - (Number(d.paid_amount) || 0)), 0);
+
+      const productsSummary = analytics.map(p => 
+        `- ${p.name_ar}: السعر=${p.sale_price}، التكلفة=${p.cost_price}، المتبقي=${p.stock_quantity} (أدنى=${p.min_safety_stock || 0})، إجمالي المباع=${p.totalQty}، إجمالي أرباحه=${p.totalProfit}`
       ).join('\n');
 
       return `
-قائمة المواد المتاحة وأسعارها ومخزونها:
+إحصائيات المحل المحسوبة:
+1. أكثر 5 منتجات بيعاً (حسب الكمية):
+${topByQty.length ? topByQty.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalQty} (أرباحه: ${p.totalProfit})`).join('\n') : 'لا يوجد'}
+
+2. أكثر 5 منتجات ربحاً:
+${topByProfit.length ? topByProfit.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalProfit} (الكمية: ${p.totalQty})`).join('\n') : 'لا يوجد'}
+
+3. منتجات قريبة من النفاد:
+${lowStock.length ? lowStock.slice(0, 10).map(p => `- ${p.name_ar}: متبقي ${p.stock_quantity}`).join('\n') : 'الكل في السليم'}
+
+4. المؤشرات المالية:
+الإيرادات: ${totalRevenue} | الأرباح: ${totalProfit} | الديون المعلقة: ${debtAmount}
+
+5. المخزون الكامل:
 ${productsSummary}
-
-سجلات عمليات البيع (الفواتير):
-${invoicesSummary}
-
-سجلات الديون المستحقة:
-${debtsSummary}
 `;
     } catch (err) {
-      console.error('Failed to build database context', err);
+      console.error('Failed to build db context', err);
       return '';
     }
   }, [db]);
@@ -169,13 +196,18 @@ ${debtsSummary}
       return;
     }
 
-    const prompt = `قم بدور مستشار المبيعات والمخازن الذكي لمحل تجاري محلي. بناءً على بيانات المحل الحالية التالية:
+    const systemPrompt = `أنت مستشار مبيعات ومخازن ذكي لمحل تجاري.
+البيانات والإحصائيات:
 ${dbContext}
 
-أعطني توصية استراتيجية ذكية واحدة للمخزون أو المبيعات (مثال: ما الذي يجب طلبه، أي المواد راكدة، أو فرصة لزيادة المبيعات).
-اجعل الإجابة احترافية، باللغة العربية الفصحى، وموجزة جداً (أقل من 3 جمل).`;
+قدم توصية استراتيجية واحدة فقط ذكية وموجزة جداً (أقل من 3 جمل) لتحسين المبيعات أو المخزون.`;
     
-    const response = await fetchGroq(prompt);
+    const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: "أعطني توصية استراتيجية للمحل الآن." }
+    ];
+
+    const response = await fetchGroq(apiMessages);
     setInsight(response);
     setLoading(false);
   }, [fetchGroq, getDatabaseContext, t]);
@@ -190,17 +222,34 @@ ${dbContext}
 
     setLoading(true);
     const dbContext = await getDatabaseContext();
-    const prompt = `أنت مساعد ذكي لإدارة المخازن والمبيعات في محل تجاري. 
-بيانات المحل الحالية هي:
+    const systemInstruction = `أنت مساعد ذكي للمبيعات في محل تجاري.
+بيانات المحل:
 ${dbContext}
 
-أجب عن استفسار المستخدم التالي بناءً على البيانات أعلاه فقط بدقة ومصداقية. إذا سألك عن أرباح مادة معينة، قم بحسابها من حاصل (سعر البيع - سعر التكلفة) مضروباً في الكمية المباعة من الفواتير.
-استفسار المستخدم: "${query}"
+قواعد صارمة:
+1. أجب باختصار شديد ومباشرة (من 1 إلى 3 أسطر فقط). يُمنع سرد كافة المنتجات.
+2. إذا سئلت عن أكثر المنتجات بيعاً أو أرباحاً أو الأقل مبيعاً، اذكر المنتج والرقم المطلوبة فوراً.
+3. تذكر مجرى الحديث وأجب بناءً على الأسئلة السابقة إذا كان سؤال المستخدم مكملاً.
+4. باللغة العربية الفصحى.`;
 
-اجعل الإجابة موجزة، واضحة، وباللغة العربية الفصحى.`;
+    const userMessage = query;
     
-    const response = await fetchGroq(prompt);
+    const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: systemInstruction },
+      ...chatHistory,
+      { role: 'user', content: userMessage }
+    ];
+
+    const response = await fetchGroq(apiMessages);
+    
     setInsight(response);
+    
+    setChatHistory(prev => {
+      const newHistory = [...prev, { role: 'user' as const, content: userMessage }, { role: 'assistant' as const, content: response }];
+      if (newHistory.length > 8) return newHistory.slice(newHistory.length - 8);
+      return newHistory;
+    });
+
     setQuery('');
     setLoading(false);
   };
