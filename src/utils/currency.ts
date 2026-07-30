@@ -36,7 +36,7 @@ export const addCustomCurrency = (code: string, symbol: string): boolean => {
     const customs: Currency[] = customsJson ? JSON.parse(customsJson) : [];
     customs.push({ code: code.toUpperCase(), symbol, isCustom: true });
     localStorage.setItem('custom_currencies', JSON.stringify(customs));
-    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new CustomEvent('currency_changed'));
     return true;
   } catch (e) {
     console.error('Failed to save custom currency', e);
@@ -52,7 +52,7 @@ export const getOfficialCurrency = (): Currency => {
 
 export const setOfficialCurrency = (code: string) => {
   localStorage.setItem('currency_preference', code);
-  window.dispatchEvent(new Event('storage'));
+  window.dispatchEvent(new CustomEvent('currency_changed'));
 };
 
 export const getPOSExchangeRate = (): number => {
@@ -62,7 +62,7 @@ export const getPOSExchangeRate = (): number => {
 
 export const setPOSExchangeRate = (rate: number) => {
   localStorage.setItem('pos_exchange_rate', rate.toString());
-  window.dispatchEvent(new Event('storage'));
+  window.dispatchEvent(new CustomEvent('currency_changed'));
 };
 
 export const getPOSHelperCurrency = (): string => {
@@ -74,7 +74,7 @@ export const getPOSHelperCurrency = (): string => {
 
 export const setPOSHelperCurrency = (code: string) => {
   localStorage.setItem('pos_helper_currency', code);
-  window.dispatchEvent(new Event('storage'));
+  window.dispatchEvent(new CustomEvent('currency_changed'));
 };
 
 export const formatCurrency = (amount: number): string => {

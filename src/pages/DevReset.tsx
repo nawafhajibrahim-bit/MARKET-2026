@@ -12,14 +12,7 @@ import React, { useState } from 'react';
 import { ShieldAlert, KeyRound, CheckCircle, Eye, EyeOff, Lock } from 'lucide-react';
 import { useDb } from '../database/Provider';
 
-// SHA-256 hash (same function used in AuthContext)
-async function hashPassword(password: string, salt: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password + salt);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+import { formatLegacyHash } from '../services/passwordService';
 
 // Developer master secret — stored in .env.local, never committed to git
 const DEV_MASTER_SECRET = import.meta.env.VITE_DEV_MASTER_SECRET as string | undefined;
@@ -76,7 +69,7 @@ export const DevReset: React.FC = () => {
         setLoading(true);
         setError('');
         try {
-            const newHash = await hashPassword('admin', 'sm_salt_2025');
+            const newHash = await formatLegacyHash('admin');
 
             const admins = await db.users.find({
                 selector: { role: { $eq: 'admin' } }
@@ -84,7 +77,7 @@ export const DevReset: React.FC = () => {
 
             for (const adminDoc of admins) {
                 // Reset password hash back to "admin"
-                await adminDoc.patch({ password_hash: newHash });
+                await adminDoc.patch({ password_hash: newHash, password_salt: '' });
                 // Remove the "password changed" flag so ForcePasswordChange triggers again
                 localStorage.removeItem(`sm_pwd_changed_${adminDoc.user_id}`);
             }

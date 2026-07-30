@@ -50,6 +50,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
+            // Input validation
+            if (!merchant_name || typeof merchant_name !== 'string' || merchant_name.length > 200) {
+                return res.status(400).json({ error: 'Invalid merchant_name' });
+            }
+            if (!phone || typeof phone !== 'string' || phone.length > 30) {
+                return res.status(400).json({ error: 'Invalid phone' });
+            }
+            if (hardware_fingerprint && (typeof hardware_fingerprint !== 'string' || hardware_fingerprint.length > 200)) {
+                return res.status(400).json({ error: 'Invalid hardware_fingerprint' });
+            }
+
             const newRequestId = 'req:' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
             
             const requestData = {
@@ -83,11 +94,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const keys = await kv.keys('req:*');
             const requests: any[] = [];
             
-            for (const key of keys) {
-                const data = await kv.get(key);
-                if (data) {
-                    requests.push(data);
-                }
+            if (keys.length > 0) {
+                const values = await kv.mget<any[]>(...keys);
+                values.forEach((data) => {
+                    if (data) {
+                        requests.push(data);
+                    }
+                });
             }
             
             // Sort newest first
@@ -99,6 +112,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         // 3. Delete action (Admin - remove a request)
         if (action === 'delete') {
             if (!request_id) return res.status(400).json({ error: 'Missing request_id' });
+            if (!request_id.startsWith('req:')) return res.status(400).json({ error: 'Invalid request ID format' });
             await kv.del(request_id);
             return res.status(200).json({ success: true, message: 'Request deleted' });
         }

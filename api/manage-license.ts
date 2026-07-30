@@ -76,19 +76,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             const trialKeys = await kv.keys('trial:*');
             const licenses: Record<string, any> = {};
             
-            for (const key of licenseKeys) {
-                const licenseKey = key.replace('license:', '');
-                const data: any = await kv.get(key);
-                if (data) {
-                    licenses[licenseKey] = { ...data, type: 'license' };
-                }
+            if (licenseKeys.length > 0) {
+                const licenseValues = await kv.mget<any[]>(...licenseKeys);
+                licenseKeys.forEach((key, i) => {
+                    const data = licenseValues[i];
+                    if (data) {
+                        licenses[key.replace('license:', '')] = { ...data, type: 'license' };
+                    }
+                });
             }
-            for (const key of trialKeys) {
-                const data: any = await kv.get(key);
-                if (data) {
-                    // We keep the 'trial:' prefix as the ID in the frontend so we know how to save/delete it
-                    licenses[key] = { ...data, type: 'trial', merchant_name: 'تجربة مجانية', phone: '' };
-                }
+            if (trialKeys.length > 0) {
+                const trialValues = await kv.mget<any[]>(...trialKeys);
+                trialKeys.forEach((key, i) => {
+                    const data = trialValues[i];
+                    if (data) {
+                        licenses[key] = { ...data, type: 'trial', merchant_name: 'تجربة مجانية', phone: '' };
+                    }
+                });
             }
             return res.status(200).json({ success: true, licenses });
         }

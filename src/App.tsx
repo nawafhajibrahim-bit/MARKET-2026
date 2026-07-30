@@ -1,26 +1,27 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { Dashboard } from './pages/Dashboard';
-import { POS } from './pages/POS';
-import { Inventory } from './pages/Inventory';
-import { Settings } from './pages/Settings';
-import { Admin } from './pages/Admin';
-import { Debts } from './pages/Debts';
-import { Purchases } from './pages/Purchases';
-import { SalesHistory } from './pages/SalesHistory';
-import { LoginScreen } from './pages/Login';
 import { LicenseInterceptor } from './components/LicenseInterceptor';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
-import { DevReset } from './pages/DevReset';
 import { useAuth } from './contexts/AuthContext';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_VERSION } from './utils/version';
 import { ArrowUpCircle, X } from 'lucide-react';
-
 import { AutoBackupRunner } from './components/AutoBackupRunner';
+
+// Lazy-loaded pages for code splitting
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const POS = lazy(() => import('./pages/POS').then(m => ({ default: m.POS })));
+const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin })));
+const Debts = lazy(() => import('./pages/Debts').then(m => ({ default: m.Debts })));
+const Purchases = lazy(() => import('./pages/Purchases').then(m => ({ default: m.Purchases })));
+const SalesHistory = lazy(() => import('./pages/SalesHistory').then(m => ({ default: m.SalesHistory })));
+const LoginScreen = lazy(() => import('./pages/Login').then(m => ({ default: m.LoginScreen })));
+const DevReset = lazy(() => import('./pages/DevReset').then(m => ({ default: m.DevReset })));
 
 // Route guard: only authenticated users
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -117,7 +118,7 @@ function App() {
               if (version === data.version && Date.now() - time < 24 * 60 * 60 * 1000) {
                 return; // skip showing banner for 24 hours
               }
-            } catch (e) {}
+            } catch {}
           }
 
           setUpdateInfo(data);
@@ -144,29 +145,37 @@ function App() {
     };
   }, []);
 
+  const LazyFallback = (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-500"></div>
+    </div>
+  );
+
   return (
     <ErrorBoundary>
       <AutoBackupRunner />
       <BrowserRouter>
-        <Routes>
-          {/* Hidden developer recovery route — no auth, no license check */}
-          <Route path="/dev-reset" element={<DevReset />} />
+        <Suspense fallback={LazyFallback}>
+          <Routes>
+            {/* Hidden developer recovery route — no auth, no license check */}
+            {import.meta.env.DEV && <Route path="/dev-reset" element={<DevReset />} />}
 
-          {/* Standalone Admin route for the program owner - only requires ADMIN_SECRET */}
-          <Route path="/owner-portal" element={<Admin />} />
+            {/* Standalone Admin route for the program owner - only requires ADMIN_SECRET */}
+            <Route path="/owner-portal" element={<Admin />} />
 
-          <Route path="/" element={<LicenseInterceptor><AuthGuard><Layout /></AuthGuard></LicenseInterceptor>}>
-            <Route index element={<Dashboard />} />
-            <Route path="pos" element={<POS />} />
-            <Route path="inventory" element={<AdminGuard><Inventory /></AdminGuard>} />
-            <Route path="purchases" element={<AdminGuard><Purchases /></AdminGuard>} />
-            <Route path="settings" element={<AdminGuard><Settings /></AdminGuard>} />
-            <Route path="debts" element={<Debts />} />
-            <Route path="sales-history" element={<SalesHistory />} />
+            <Route path="/" element={<LicenseInterceptor><AuthGuard><Layout /></AuthGuard></LicenseInterceptor>}>
+              <Route index element={<Dashboard />} />
+              <Route path="pos" element={<POS />} />
+              <Route path="inventory" element={<AdminGuard><Inventory /></AdminGuard>} />
+              <Route path="purchases" element={<AdminGuard><Purchases /></AdminGuard>} />
+              <Route path="settings" element={<AdminGuard><Settings /></AdminGuard>} />
+              <Route path="debts" element={<Debts />} />
+              <Route path="sales-history" element={<SalesHistory />} />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
 
       {/* Floating Notification Banner */}

@@ -6,7 +6,7 @@ import { getHardwareFingerprint } from '../services/fingerprintService';
 import { encryptData, decryptData } from '../services/cryptoService';
 
 const DEMO_LICENSE_KEY = 'TEST-LICENSE';
-const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false';
+const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 const OWNER_PHONE = '009647510171376';
 const OWNER_WHATSAPP_URL = 'https://wa.me/9647510171376';
 

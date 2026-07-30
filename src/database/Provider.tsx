@@ -29,94 +29,88 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         };
     }, []);
 
-    const handleEmergencyExport = () => {
+    const handleEmergencyExport = async () => {
         try {
-            const dbName = 'smartmarketdb_v4';
-            const request = indexedDB.open(dbName);
-            request.onsuccess = async (event: any) => {
-                const idb = event.target.result;
-                const storeNames = Array.from(idb.objectStoreNames) as string[];
-                const backupData: any = {};
-                
-                if (storeNames.length === 0) {
-                    alert('No database collections found to export.');
-                    idb.close();
-                    return;
-                }
+            // RxDB+Dexie creates per-collection databases named rxdb-dexie-<dbName>-<collection>
+            const allDbs = await indexedDB.databases?.() || [];
+            const rxdbPrefix = 'rxdb-dexie-smartmarketdb_v4-';
+            const matchingDbs = allDbs.filter(db => db.name?.startsWith(rxdbPrefix));
 
+            if (matchingDbs.length === 0) {
+                alert('No RxDB database collections found to export.');
+                return;
+            }
+
+            const backupData: Record<string, any[]> = {};
+
+            for (const dbInfo of matchingDbs) {
+                const dbName = dbInfo.name!;
+                const collectionName = dbName.substring(rxdbPrefix.length);
                 try {
-                    const transaction = idb.transaction(storeNames, 'readonly');
-                    const promises = storeNames.map((storeName) => {
-                        return new Promise<void>((resolve, reject) => {
-                            const store = transaction.objectStore(storeName);
+                    const idb = await new Promise<IDBDatabase>((resolve, reject) => {
+                        const req = indexedDB.open(dbName);
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror = () => reject(req.error);
+                    });
+
+                    const storeNames = Array.from(idb.objectStoreNames) as string[];
+                    for (const storeName of storeNames) {
+                        const docs = await new Promise<any[]>((resolve, reject) => {
+                            const tx = idb.transaction(storeName, 'readonly');
+                            const store = tx.objectStore(storeName);
                             const req = store.getAll();
-                            req.onsuccess = (e: any) => {
-                                backupData[storeName] = e.target.result;
-                                resolve();
-                            };
-                            req.onerror = () => {
-                                reject(req.error);
-                            };
+                            req.onsuccess = () => resolve(req.result);
+                            req.onerror = () => reject(req.error);
                         });
-                    });
-
-                    await Promise.all(promises);
-
-                    const prefix = `${dbName}-`;
-                    const rxdbDump: any = {
-                        name: dbName,
-                        collections: []
-                    };
-
-                    storeNames.forEach((storeName) => {
-                        if (storeName.startsWith(prefix)) {
-                            const collectionName = storeName.substring(prefix.length);
-                            if (!collectionName.startsWith('_') && !collectionName.includes('-')) {
-                                const docs = (backupData[storeName] || []).map((doc: any) => ({ ...doc }));
-                                rxdbDump.collections.push({
-                                    name: collectionName,
-                                    schema: {
-                                        title: collectionName,
-                                        version: 0,
-                                        primaryKey: collectionName === 'products' ? 'id' : 
-                                                    collectionName === 'users' ? 'user_id' : 
-                                                    collectionName === 'invoices' ? 'invoice_id' :
-                                                    collectionName === 'debts' ? 'debt_id' :
-                                                    collectionName === 'units' ? 'unit_id' : 'id',
-                                        type: 'object',
-                                        properties: {}
-                                    },
-                                    documents: docs
-                                });
-                            }
+                        if (docs.length > 0) {
+                            backupData[collectionName] = docs.map(doc => ({ ...doc }));
                         }
-                    });
-
-                    const jsonStr = JSON.stringify(rxdbDump, null, 2);
-                    const blob = new Blob([jsonStr], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `smartmarket_emergency_backup_${new Date().toISOString().split('T')[0]}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    alert('Emergency backup exported successfully! Please clear site data now, reload, and import this file.');
-                } catch (err) {
-                    console.error(err);
-                    alert('Failed to read database stores: ' + String(err));
-                } finally {
+                    }
                     idb.close();
+                } catch (err) {
+                    console.warn(`Failed to read collection ${collectionName}:`, err);
                 }
+            }
+
+            const primaryKeyMap: Record<string, string> = {
+                products: 'id', users: 'user_id', invoices: 'invoice_id',
+                debts: 'debt_id', units: 'unit_id', system_config: 'config_id',
+                purchases: 'purchase_id', categories: 'category_id',
             };
-            request.onerror = () => {
-                alert('Failed to open database: ' + String(request.error));
+
+            const rxdbDump: any = {
+                name: 'smartmarketdb_v4',
+                collections: Object.entries(backupData)
+                    .filter(([name]) => !name.startsWith('_') && !name.includes('-'))
+                    .map(([name, documents]) => ({
+                        name,
+                        schema: {
+                            title: name,
+                            version: 0,
+                            primaryKey: primaryKeyMap[name] || 'id',
+                            type: 'object',
+                            properties: {}
+                        },
+                        documents
+                    }))
             };
+
+            const jsonStr = JSON.stringify(rxdbDump, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `smartmarket_emergency_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            alert('Emergency backup exported successfully! Please clear site data now, reload, and import this file.');
         } catch (err) {
+            console.error(err);
             alert('Emergency export failed: ' + String(err));
         }
     };
 
-    const handleClearAndReset = () => {
+    const handleClearAndReset = async () => {
         const confirmReset = window.confirm(
             '⚠️ تحذير: سيتم مسح قاعدة البيانات المحلية وإعادة تشغيل التطبيق.\n' +
             'الرجاء التأكد من تصدير نسخة احتياطية أولاً باستخدام الزر البرتقالي.\n\n' +
@@ -125,28 +119,25 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         if (!confirmReset) return;
 
         try {
-            const dbName = 'smartmarketdb_v4';
-            const req = indexedDB.deleteDatabase(dbName);
-            
-            req.onsuccess = () => {
-                localStorage.clear();
-                alert('تم مسح البيانات بنجاح. سيتم إعادة تشغيل التطبيق الآن.');
-                window.location.reload();
-            };
-            
-            req.onerror = () => {
-                localStorage.clear();
-                alert('فشل المسح التلقائي بالكامل، سيتم إعادة تشغيل التطبيق. يرجى مسح بيانات المتصفح يدوياً إذا لم تنجح العملية.');
-                window.location.reload();
-            };
-            
-            req.onblocked = () => {
-                localStorage.clear();
-                alert('العملية معلقة بسبب نوافذ أخرى مفتوحة. يرجى إغلاق جميع نوافذ البرنامج الأخرى ثم إعادة المحاولة، أو مسح بيانات المتصفح يدوياً.');
-                window.location.reload();
-            };
-        } catch (err) {
+            const allDbs = await indexedDB.databases?.() || [];
+            const rxdbDbs = allDbs.filter(db => db.name?.startsWith('rxdb-dexie-smartmarketdb_v4'));
+
+            const deletePromises = rxdbDbs.map(dbInfo => {
+                return new Promise<void>((resolve) => {
+                    const req = indexedDB.deleteDatabase(dbInfo.name!);
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => resolve(); // continue even on error
+                    req.onblocked = () => resolve();
+                });
+            });
+
+            await Promise.all(deletePromises);
             localStorage.clear();
+            alert('تم مسح البيانات بنجاح. سيتم إعادة تشغيل التطبيق الآن.');
+            window.location.reload();
+        } catch {
+            localStorage.clear();
+            alert('فشل المسح التلقائي بالكامل، سيتم إعادة تشغيل التطبيق. يرجى مسح بيانات المتصفح يدوياً إذا لم تنجح العملية.');
             window.location.reload();
         }
     };

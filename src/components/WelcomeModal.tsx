@@ -45,7 +45,7 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'get-config' })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (res.ok && data.success && data.config) {
           setConfig(data.config);
         }

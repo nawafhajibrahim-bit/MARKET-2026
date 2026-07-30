@@ -118,10 +118,19 @@ export default function AIEngine() {
 
   const getDatabaseContext = useCallback(async () => {
     try {
+      // Only fetch invoices from the last 30 days to avoid memory issues
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoISO = thirtyDaysAgo.toISOString();
+
       const [productDocs, invoiceDocs, debtDocs] = await Promise.all([
         db.products.find().exec(),
-        db.invoices.find().exec(),
-        db.debts.find().exec(),
+        db.invoices.find({
+          selector: { created_at: { $gte: thirtyDaysAgoISO } }
+        }).exec(),
+        db.debts.find({
+          selector: { status: { $ne: 'Paid' } }
+        }).exec(),
       ]);
 
       const products = productDocs.map(d => d.toJSON());
@@ -157,15 +166,31 @@ export default function AIEngine() {
       const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
       const totalProfit = invoices.reduce((sum, inv) => sum + (Number(inv.actual_profit) || 0), 0);
       
-      const pendingDebts = debts.filter(d => d.status !== 'Paid');
-      const debtAmount = pendingDebts.reduce((sum, d) => sum + ((Number(d.amount) || 0) - (Number(d.paid_amount) || 0)), 0);
+      const debtAmount = debts.reduce((sum, d) => sum + ((Number(d.amount) || 0) - (Number(d.paid_amount) || 0)), 0);
 
-      const productsSummary = analytics.map(p => 
-        `- ${p.name_ar}: السعر=${p.sale_price}، التكلفة=${p.cost_price}، المتبقي=${p.stock_quantity} (أدنى=${p.min_safety_stock || 0})، إجمالي المباع=${p.totalQty}، إجمالي أرباحه=${p.totalProfit}`
-      ).join('\n');
+      // Only include top 10 and bottom 10 products instead of entire catalog
+      const topProducts = analytics
+        .filter(p => p.totalQty > 0)
+        .sort((a, b) => b.totalQty - a.totalQty)
+        .slice(0, 10);
+      const bottomProducts = analytics
+        .filter(p => p.totalQty === 0 && p.stock_quantity > 0)
+        .slice(0, 10);
+
+      const productsSummary = [
+        ...topProducts.map(p => 
+          `- ${p.name_ar}: السعر=${p.sale_price}، التكلفة=${p.cost_price}، المتبقي=${p.stock_quantity}، المباع=${p.totalQty}، أرباحه=${p.totalProfit}`
+        ),
+        ...(bottomProducts.length > 0 ? [
+          '\n--- منتجات لم تُباع (عينة):',
+          ...bottomProducts.map(p => 
+            `- ${p.name_ar}: السعر=${p.sale_price}، المتبقي=${p.stock_quantity}`
+          )
+        ] : [])
+      ].join('\n');
 
       return `
-إحصائيات المحل المحسوبة:
+إحصائيات المحل (آخر 30 يوم — ${invoices.length} فاتورة — ${products.length} منتج):
 1. أكثر 5 منتجات بيعاً (حسب الكمية):
 ${topByQty.length ? topByQty.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalQty} (أرباحه: ${p.totalProfit})`).join('\n') : 'لا يوجد'}
 
@@ -178,7 +203,7 @@ ${lowStock.length ? lowStock.slice(0, 10).map(p => `- ${p.name_ar}: متبقي $
 4. المؤشرات المالية:
 الإيرادات: ${totalRevenue} | الأرباح: ${totalProfit} | الديون المعلقة: ${debtAmount}
 
-5. المخزون الكامل:
+5. عينة من المخزون (أعلى و أدنى مبيعاً):
 ${productsSummary}
 `;
     } catch (err) {
@@ -219,6 +244,12 @@ ${dbContext}
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query) return;
+
+    // Stop speech recognition if still active
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
 
     setLoading(true);
     const dbContext = await getDatabaseContext();

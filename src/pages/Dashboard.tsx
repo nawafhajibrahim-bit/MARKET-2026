@@ -37,7 +37,11 @@ export const Dashboard = () => {
     const checkAi = () => setAiEnabled(localStorage.getItem('ai_enabled') !== 'false');
     checkAi();
     window.addEventListener('storage', checkAi);
-    return () => window.removeEventListener('storage', checkAi);
+    window.addEventListener('currency_changed', checkAi);
+    return () => {
+      window.removeEventListener('storage', checkAi);
+      window.removeEventListener('currency_changed', checkAi);
+    };
   }, []);
 
   useEffect(() => {
@@ -159,7 +163,8 @@ export const Dashboard = () => {
     invoices.forEach(inv => {
       (inv.items || []).forEach((item) => {
         if (item.product_id && item.quantity !== undefined) {
-          productSaleCount[item.product_id] = (productSaleCount[item.product_id] || 0) + item.quantity;
+          const qty = (inv.total_amount || 0) >= 0 ? item.quantity : -item.quantity;
+          productSaleCount[item.product_id] = (productSaleCount[item.product_id] || 0) + qty;
         }
       });
     });

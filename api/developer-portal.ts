@@ -45,6 +45,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             if (!feedback || !feedback.message) {
                 return res.status(400).json({ error: 'Feedback message is required' });
             }
+            if (typeof feedback.message !== 'string' || feedback.message.length > 2000) {
+                return res.status(400).json({ error: 'Invalid feedback message' });
+            }
             const id = 'fb-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
             const feedbackData = {
                 id,
@@ -57,7 +60,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             
             await kv.set(`feedback:${id}`, feedbackData);
             return res.status(200).json({ success: true, message: 'Feedback submitted' });
-        } catch (err) {
+        } catch {
             return res.status(500).json({ error: 'Internal server error' });
         }
     }
@@ -73,7 +76,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 ads_title: 'التحديثات الأخيرة'
             };
             return res.status(200).json({ success: true, config: devConfig });
-        } catch (err) {
+        } catch {
             return res.status(500).json({ error: 'Internal server error' });
         }
     }
@@ -92,10 +95,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     try {
         if (action === 'list-feedback') {
             const keys = await kv.keys('feedback:*');
-            const feedbacks = [];
-            for (const key of keys) {
-                const data = await kv.get(key);
-                if (data) feedbacks.push(data);
+            const feedbacks: any[] = [];
+            if (keys.length > 0) {
+                const values = await kv.mget<any[]>(...keys);
+                values.forEach(data => {
+                    if (data) feedbacks.push(data);
+                });
             }
             // Sort newest first
             feedbacks.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -115,7 +120,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         return res.status(400).json({ error: 'Invalid action' });
-    } catch (err) {
+    } catch {
         return res.status(500).json({ error: 'Internal server error' });
     }
 }

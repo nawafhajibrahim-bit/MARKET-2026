@@ -52,6 +52,10 @@ export const runAutoBackup = async (db: import('rxdb').RxDatabase) => {
         console.log('Auto-backup completed successfully!');
     } catch (err) {
         console.error('Auto-backup failed:', err);
+        // Notify the user that backup failed (dispatch event for toast system)
+        window.dispatchEvent(new CustomEvent('auto_backup_failed', { 
+            detail: { error: String(err), timestamp: new Date().toISOString() }
+        }));
     }
 };
 

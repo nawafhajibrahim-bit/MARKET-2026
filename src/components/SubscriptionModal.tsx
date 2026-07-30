@@ -102,7 +102,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose })
                                activationKey === '1234' || 
                                activationKey === '123456' || 
                                activationKey === '123';
-      const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false';
+      const isDemoLoginEnabled = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
       
       if (isDemoLoginEnabled && isDemoBypassKey) {
           const fullTokenPayload = JSON.stringify({ license_key: activationKey, hw_fingerprint: hwFingerprint });
