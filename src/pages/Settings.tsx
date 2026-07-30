@@ -4,7 +4,7 @@ import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload,
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
 import { useAuth } from '../contexts/AuthContext';
-import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency, getPOSExchangeRate, setPOSExchangeRate, getPOSHelperCurrency, setPOSHelperCurrency } from '../utils/currency';
+import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency, getPOSExchangeRate, setPOSExchangeRate, getPOSHelperCurrency, setPOSHelperCurrency, getIsHelperCurrencyEnabled, setIsHelperCurrencyEnabled } from '../utils/currency';
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
 import { runAutoBackup } from '../components/AutoBackupRunner';
 import { hashPassword as secureHashPassword, generateSalt } from '../services/passwordService';
@@ -132,6 +132,7 @@ export const Settings = () => {
 
   const [currencies, setCurrencies] = useState(getCurrenciesList);
   const [officialCurrency, setOfficialCurrencyState] = useState(getOfficialCurrency().code);
+  const [isHelperCurrencyEnabled, setIsHelperCurrencyEnabledState] = useState(() => getIsHelperCurrencyEnabled());
   const [helperCurrency, setHelperCurrencyState] = useState(() => getPOSHelperCurrency());
   const [exchangeRate, setExchangeRateState] = useState(() => getPOSExchangeRate());
   const [customCode, setCustomCode] = useState('');
@@ -249,6 +250,11 @@ export const Settings = () => {
   const handleExchangeRateChange = (val: number) => {
     setExchangeRateState(val);
     setPOSExchangeRate(val);
+  };
+
+  const handleToggleHelperCurrency = (enabled: boolean) => {
+    setIsHelperCurrencyEnabledState(enabled);
+    setIsHelperCurrencyEnabled(enabled);
   };
 
   const handleAddCurrency = (e: React.FormEvent) => {
@@ -1127,6 +1133,24 @@ export const Settings = () => {
         </div>
 
         <div className="space-y-6">
+            {/* Enable Helper Currency Toggle */}
+            <div className="flex items-center justify-between pb-4 border-b border-black/5 dark:border-white/5">
+                <div>
+                    <h4 className="font-medium text-lg">{i18n.language.startsWith('ar') ? 'تفعيل العملة المساعدة' : 'Enable Helper Currency'}</h4>
+                    <p className="text-sm text-gray-500">
+                        {i18n.language.startsWith('ar') 
+                            ? 'قم بتفعيل هذا الخيار إذا كنت ترغب بالبيع وتسعير المنتجات بعملتين معاً (مثل العملة المحلية والدولار).' 
+                            : 'Enable this option if you want to sell and price products in two currencies simultaneously.'}
+                    </p>
+                </div>
+                <button
+                    onClick={() => handleToggleHelperCurrency(!isHelperCurrencyEnabled)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors cursor-pointer ${isHelperCurrencyEnabled ? 'bg-[var(--color-primary)]' : 'bg-gray-300 dark:bg-gray-600'}`}
+                >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${isHelperCurrencyEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+            </div>
+
             {/* Select Official Currency */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                 <div>
@@ -1146,46 +1170,50 @@ export const Settings = () => {
                 </select>
             </div>
 
-            {/* Select Helper Currency */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-4 border-t border-black/5 dark:border-white/5">
-                <div>
-                    <h4 className="font-medium text-lg">{t('default_helper_currency')}</h4>
-                    <p className="text-sm text-gray-500">{t('default_helper_currency_desc')}</p>
+            {isHelperCurrencyEnabled && (
+              <>
+                {/* Select Helper Currency */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-4 border-t border-black/5 dark:border-white/5">
+                    <div>
+                        <h4 className="font-medium text-lg">{t('default_helper_currency')}</h4>
+                        <p className="text-sm text-gray-500">{t('default_helper_currency_desc')}</p>
+                    </div>
+                    <select 
+                        value={helperCurrency}
+                        onChange={(e) => handleHelperCurrencyChange(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all font-medium"
+                    >
+                        {currencies
+                          .filter(c => c.code !== officialCurrency)
+                          .map(c => (
+                            <option key={c.code} value={c.code}>
+                                {c.code} ({c.symbol})
+                            </option>
+                        ))}
+                    </select>
                 </div>
-                <select 
-                    value={helperCurrency}
-                    onChange={(e) => handleHelperCurrencyChange(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all font-medium"
-                >
-                    {currencies
-                      .filter(c => c.code !== officialCurrency)
-                      .map(c => (
-                        <option key={c.code} value={c.code}>
-                            {c.code} ({c.symbol})
-                        </option>
-                    ))}
-                </select>
-            </div>
 
-            {/* Default Exchange Rate Helper */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-4 border-t border-black/5 dark:border-white/5">
-                <div>
-                    <h4 className="font-medium text-lg">{t('default_exchange_rate')}</h4>
-                    <p className="text-sm text-gray-500">{t('default_exchange_rate_desc')}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm">1 {helperCurrency} =</span>
-                    <input 
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        value={exchangeRate || ''}
-                        onChange={(e) => handleExchangeRateChange(Number(e.target.value))}
-                        className="flex-1 px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono"
+                {/* Default Exchange Rate Helper */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-4 border-t border-black/5 dark:border-white/5">
+                    <div>
+                        <h4 className="font-medium text-lg">{t('default_exchange_rate')}</h4>
+                        <p className="text-sm text-gray-500">{t('default_exchange_rate_desc')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">1 {helperCurrency} =</span>
+                        <input 
+                            type="number"
+                            min="0"
+                            step="0.000001"
+                            value={exchangeRate || ''}
+                            onChange={(e) => handleExchangeRateChange(Number(e.target.value))}
+                            className="flex-1 px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-mono"
                     />
                     <span className="font-mono text-sm">{currencies.find(c => c.code === officialCurrency)?.symbol || officialCurrency}</span>
                 </div>
-            </div>
+                </div>
+              </>
+            )}
 
             {/* Add Custom Currency Form */}
             <div className="pt-6 border-t border-black/5 dark:border-white/5">

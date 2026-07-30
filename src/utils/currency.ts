@@ -77,6 +77,17 @@ export const setPOSHelperCurrency = (code: string) => {
   window.dispatchEvent(new CustomEvent('currency_changed'));
 };
 
+export const getIsHelperCurrencyEnabled = (): boolean => {
+  const enabled = localStorage.getItem('pos_helper_currency_enabled');
+  // Default is false for ease of use, as requested
+  return enabled === 'true';
+};
+
+export const setIsHelperCurrencyEnabled = (enabled: boolean) => {
+  localStorage.setItem('pos_helper_currency_enabled', enabled.toString());
+  window.dispatchEvent(new CustomEvent('currency_changed'));
+};
+
 export const formatCurrency = (amount: number): string => {
   const curr = getOfficialCurrency();
   const formattedAmount = amount.toLocaleString(undefined, {

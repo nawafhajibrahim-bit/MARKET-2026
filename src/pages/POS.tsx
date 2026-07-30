@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle, Camera, Keyboard, X } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
-import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList, getPOSHelperCurrency, setPOSHelperCurrency } from '../utils/currency';
+import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList, getPOSHelperCurrency, setPOSHelperCurrency, getIsHelperCurrencyEnabled } from '../utils/currency';
 import { Receipt } from '../components/Receipt';
 import { useCart } from '../hooks/useCart';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -315,6 +315,7 @@ export const POS = () => {
   const [helperCurrencyCode, setHelperCurrencyCodeState] = useState(() => {
     return getPOSHelperCurrency();
   });
+  const [isHelperCurrencyEnabled] = useState(() => getIsHelperCurrencyEnabled());
   const [customRate, setCustomRate] = useState(defaultRate);
 
   const getInitialBaseAndQuote = (official: string, helper: string) => {
@@ -1162,7 +1163,8 @@ export const POS = () => {
                 )}
                 
                 {/* Dynamic Currency Converter Helper */}
-                <div className="mt-4 pt-4 border-t border-black/10 dark:border-white/10 space-y-3">
+                {isHelperCurrencyEnabled && (
+                  <div className="mt-4 pt-4 border-t border-black/10 dark:border-white/10 space-y-3">
                   <button
                     type="button"
                     onClick={() => setShowConverter(!showConverter)}
@@ -1385,6 +1387,7 @@ export const POS = () => {
                     );
                   })()}
                 </div>
+                )}
               </div>
             </div>
 
