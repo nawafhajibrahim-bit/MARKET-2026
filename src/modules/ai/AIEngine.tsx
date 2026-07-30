@@ -126,7 +126,7 @@ export default function AIEngine() {
       const [productDocs, invoiceDocs, debtDocs] = await Promise.all([
         db.products.find().exec(),
         db.invoices.find({
-          selector: { created_at: { $gte: thirtyDaysAgoISO } }
+          selector: { timestamp: { $gte: thirtyDaysAgoISO } }
         }).exec(),
         db.debts.find({
           selector: { status: { $ne: 'Paid' } }
