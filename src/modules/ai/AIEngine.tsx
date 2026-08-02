@@ -31,7 +31,7 @@ export default function AIEngine() {
   const [insightLoading, setInsightLoading] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const questionCategories: QuestionCategory[] = [
@@ -109,8 +109,8 @@ export default function AIEngine() {
 
   // Auto-scroll to bottom when new messages appear
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, loading]);
 
@@ -586,7 +586,7 @@ ${dbContext}
         </div>
 
         {/* Messages Area */}
-        <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto min-h-[120px]" style={{ scrollBehavior: 'smooth' }}>
+        <div ref={chatContainerRef} className="p-4 space-y-3 max-h-[400px] overflow-y-auto min-h-[120px]" style={{ scrollBehavior: 'smooth' }}>
           {messages.length === 0 && !loading && (
             <div className="text-center py-8 text-gray-400 dark:text-gray-500">
               <Bot size={40} className="mx-auto mb-3 opacity-50" />
@@ -637,8 +637,6 @@ ${dbContext}
               </div>
             </div>
           )}
-
-          <div ref={chatEndRef} />
         </div>
 
         {/* Input Area */}
