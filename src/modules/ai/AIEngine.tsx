@@ -1,19 +1,118 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Sparkles, Send, BrainCircuit, AlertCircle, X, Mic, MicOff } from 'lucide-react';
+import { Sparkles, Send, BrainCircuit, AlertCircle, X, Mic, MicOff, Trash2, ChevronDown, ChevronUp, TrendingUp, Package, DollarSign, Truck, Lightbulb, Bot, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useDb } from '../../database/Provider';
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+interface QuestionCategory {
+  icon: React.ReactNode;
+  labelAr: string;
+  labelEn: string;
+  color: string;
+  questions: { ar: string; en: string }[];
+}
+
 export default function AIEngine() {
   const { t, i18n } = useTranslation();
+  const isAr = i18n.language.startsWith('ar');
   const db = useDb();
   const [query, setQuery] = useState('');
-  const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showAiWarning, setShowAiWarning] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insight, setInsight] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const questionCategories: QuestionCategory[] = [
+    {
+      icon: <TrendingUp size={14} />,
+      labelAr: '📊 المبيعات والفواتير',
+      labelEn: '📊 Sales & Invoices',
+      color: 'blue',
+      questions: [
+        { ar: 'ما هي أعلى فاتورة مبيعاً وكم قيمتها؟', en: 'What is the highest invoice and its value?' },
+        { ar: 'ما هو متوسط قيمة الفاتورة؟', en: 'What is the average invoice value?' },
+        { ar: 'ما هي نسبة الربح الإجمالية؟', en: 'What is the overall profit margin?' },
+        { ar: 'ما هو أفضل يوم مبيعاً هذا الشهر؟', en: 'What was the best sales day this month?' },
+        { ar: 'أعطني ملخص المبيعات لهذا الأسبوع', en: 'Give me this week\'s sales summary' },
+      ]
+    },
+    {
+      icon: <Package size={14} />,
+      labelAr: '📦 المخزون والمنتجات',
+      labelEn: '📦 Inventory & Products',
+      color: 'emerald',
+      questions: [
+        { ar: 'ما هي المنتجات التي ستنفد قريباً؟', en: 'Which products are running low?' },
+        { ar: 'ما هي المنتجات التي لم تُباع أبداً؟', en: 'Which products have never been sold?' },
+        { ar: 'ما هو المنتج الأعلى ربحاً؟', en: 'Which product has the highest profit?' },
+        { ar: 'ما هي المنتجات القريبة من انتهاء الصلاحية؟', en: 'Which products are near expiry?' },
+        { ar: 'ما هي أكثر الفئات مبيعاً؟', en: 'What are the best-selling categories?' },
+      ]
+    },
+    {
+      icon: <DollarSign size={14} />,
+      labelAr: '💰 الديون والعملاء',
+      labelEn: '💰 Debts & Customers',
+      color: 'amber',
+      questions: [
+        { ar: 'من هو أكثر زبون عليه ديون؟', en: 'Who is the customer with the most debt?' },
+        { ar: 'ما هو إجمالي الديون المعلقة؟', en: 'What is the total outstanding debt?' },
+        { ar: 'كم عدد العملاء المديونين؟', en: 'How many customers have debts?' },
+        { ar: 'ما هي الديون المتأخرة عن موعدها؟', en: 'Which debts are past due?' },
+      ]
+    },
+    {
+      icon: <Truck size={14} />,
+      labelAr: '🚚 الموردين والمشتريات',
+      labelEn: '🚚 Suppliers & Purchases',
+      color: 'violet',
+      questions: [
+        { ar: 'من هو أفضل مورد لدينا؟', en: 'Who is our best supplier?' },
+        { ar: 'ما هو إجمالي المشتريات هذا الشهر؟', en: 'What are total purchases this month?' },
+        { ar: 'كم المبالغ غير المدفوعة للموردين؟', en: 'How much is owed to suppliers?' },
+      ]
+    },
+    {
+      icon: <Lightbulb size={14} />,
+      labelAr: '💡 استشارات واقتراحات',
+      labelEn: '💡 Advice & Suggestions',
+      color: 'rose',
+      questions: [
+        { ar: 'كيف يمكنني زيادة المبيعات؟', en: 'How can I increase sales?' },
+        { ar: 'كيف أحسن إدارة المخزون؟', en: 'How can I improve inventory management?' },
+        { ar: 'أعطني تقريراً سريعاً عن حالة المحل', en: 'Give me a quick store status report' },
+        { ar: 'ما هي نقاط الضعف في أداء المحل؟', en: 'What are the weaknesses in store performance?' },
+        { ar: 'ما هي المنتجات التي يجب التركيز عليها؟', en: 'Which products should I focus on?' },
+      ]
+    }
+  ];
+
+  const colorMap: Record<string, { bg: string; border: string; text: string; hover: string }> = {
+    blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-700 dark:text-blue-300', hover: 'hover:bg-blue-500/20' },
+    emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-700 dark:text-emerald-300', hover: 'hover:bg-emerald-500/20' },
+    amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-700 dark:text-amber-300', hover: 'hover:bg-amber-500/20' },
+    violet: { bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-700 dark:text-violet-300', hover: 'hover:bg-violet-500/20' },
+    rose: { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-700 dark:text-rose-300', hover: 'hover:bg-rose-500/20' },
+  };
+
+  // Auto-scroll to bottom when new messages appear
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, loading]);
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -26,12 +125,12 @@ export default function AIEngine() {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(i18n.language.startsWith('ar') ? 'متصفحك لا يدعم ميزة التحدث بالصوت.' : 'Your browser does not support speech recognition.');
+      alert(isAr ? 'متصفحك لا يدعم ميزة التحدث بالصوت.' : 'Your browser does not support speech recognition.');
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = i18n.language.startsWith('ar') ? 'ar-SA' : 'en-US';
+    recognition.lang = isAr ? 'ar-SA' : 'en-US';
     recognition.continuous = true;
     recognition.interimResults = true;
 
@@ -72,7 +171,7 @@ export default function AIEngine() {
     localStorage.setItem('dismiss_ai_warning', 'true');
   };
 
-  const fetchGroq = useCallback(async (messages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
+  const fetchGroq = useCallback(async (apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
     const customKey = localStorage.getItem('custom_groq_key') || '';
     let selectedModel = localStorage.getItem('ai_model') || 'llama-3.1-8b-instant';
     if (selectedModel === 'llama3-8b-8192') {
@@ -97,7 +196,7 @@ export default function AIEngine() {
         },
         body: JSON.stringify({
           model: selectedModel,
-          messages,
+          messages: apiMessages,
           temperature: 0.3
         })
       });
@@ -118,12 +217,20 @@ export default function AIEngine() {
 
   const getDatabaseContext = useCallback(async () => {
     try {
-      // Only fetch invoices from the last 30 days to avoid memory issues
+      const now = new Date();
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const thirtyDaysAgoISO = thirtyDaysAgo.toISOString();
 
-      const [productDocs, invoiceDocs, debtDocs] = await Promise.all([
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoISO = sevenDaysAgo.toISOString();
+
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      const fourteenDaysAgoISO = fourteenDaysAgo.toISOString();
+
+      const [productDocs, invoiceDocs, debtDocs, purchaseDocs] = await Promise.all([
         db.products.find().exec(),
         db.invoices.find({
           selector: { timestamp: { $gte: thirtyDaysAgoISO } }
@@ -131,11 +238,13 @@ export default function AIEngine() {
         db.debts.find({
           selector: { status: { $ne: 'Paid' } }
         }).exec(),
+        db.purchases.find().exec(),
       ]);
 
       const products = productDocs.map(d => d.toJSON());
       const invoices = invoiceDocs.map(d => d.toJSON());
       const debts = debtDocs.map(d => d.toJSON());
+      const purchases = purchaseDocs.map(d => d.toJSON());
 
       // Pre-calculate sales data
       const productSalesMap: Record<string, { qty: number; profit: number }> = {};
@@ -165,10 +274,45 @@ export default function AIEngine() {
 
       const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
       const totalProfit = invoices.reduce((sum, inv) => sum + (Number(inv.actual_profit) || 0), 0);
+      const avgInvoiceValue = invoices.length > 0 ? Math.round(totalRevenue / invoices.length) : 0;
+      const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0';
       
       const debtAmount = debts.reduce((sum, d) => sum + ((Number(d.amount) || 0) - (Number(d.paid_amount) || 0)), 0);
 
-      // Only include top 10 and bottom 10 products instead of entire catalog
+      // Weekly comparison
+      const thisWeekInvoices = invoices.filter(inv => inv.timestamp >= sevenDaysAgoISO);
+      const lastWeekInvoices = invoices.filter(inv => inv.timestamp >= fourteenDaysAgoISO && inv.timestamp < sevenDaysAgoISO);
+      const thisWeekRevenue = thisWeekInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
+      const lastWeekRevenue = lastWeekInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
+      const weeklyTrend = lastWeekRevenue > 0 ? (((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue) * 100).toFixed(1) : 'N/A';
+
+      // Best sales day
+      const dailySales: Record<string, number> = {};
+      invoices.forEach(inv => {
+        const day = inv.timestamp?.substring(0, 10) || '';
+        if (day) dailySales[day] = (dailySales[day] || 0) + (Number(inv.total_amount) || 0);
+      });
+      const bestDay = Object.entries(dailySales).sort((a, b) => b[1] - a[1])[0];
+
+      // Category analysis
+      const categorySales: Record<string, { qty: number; revenue: number }> = {};
+      invoices.forEach(inv => {
+        (inv.items || []).forEach((item: any) => {
+          const prod = products.find(p => p.id === item.product_id);
+          const cat = prod?.category || 'غير مصنف';
+          if (!categorySales[cat]) categorySales[cat] = { qty: 0, revenue: 0 };
+          categorySales[cat].qty += Number(item.quantity) || 0;
+          categorySales[cat].revenue += (Number(item.quantity) || 0) * (Number(item.price) || 0);
+        });
+      });
+      const topCategories = Object.entries(categorySales).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5);
+
+      // Expiry alerts (within 30 days)
+      const expiryThreshold = new Date();
+      expiryThreshold.setDate(expiryThreshold.getDate() + 30);
+      const nearExpiry = products.filter(p => p.expiry_date && new Date(p.expiry_date) <= expiryThreshold && new Date(p.expiry_date) >= now);
+
+      // Top 10 and bottom 10 products
       const topProducts = analytics
         .filter(p => p.totalQty > 0)
         .sort((a, b) => b.totalQty - a.totalQty)
@@ -176,6 +320,31 @@ export default function AIEngine() {
       const bottomProducts = analytics
         .filter(p => p.totalQty === 0 && p.stock_quantity > 0)
         .slice(0, 10);
+
+      // Top Debtors
+      const customerDebts = debts
+        .filter(d => d.type === 'Customer Debt' || !d.type)
+        .map(d => ({ ...d, netDebt: (Number(d.amount) || 0) - (Number(d.paid_amount) || 0) }))
+        .sort((a, b) => b.netDebt - a.netDebt);
+      const topDebtors = customerDebts.slice(0, 5).map(d => `- ${d.client_supplier_name}: عليه ${d.netDebt} (الإجمالي: ${d.amount}${d.due_date ? `، الاستحقاق: ${d.due_date}` : ''})`).join('\n');
+      const overdueDebts = debts.filter(d => d.due_date && new Date(d.due_date) < now && d.status !== 'Paid');
+
+      // Top Invoices
+      const topInvoices = [...invoices].sort((a, b) => Number(b.total_amount) - Number(a.total_amount)).slice(0, 5).map(inv => `- فاتورة رقم ${inv.invoice_id}: بقيمة ${inv.total_amount} (التاريخ: ${inv.timestamp?.substring(0, 10) || 'غير معروف'}، الربح: ${inv.actual_profit || 'غير محدد'})`).join('\n');
+
+      // Top Suppliers
+      const supplierMap: Record<string, { total: number; count: number; unpaid: number }> = {};
+      purchases.forEach(p => {
+        const sName = p.supplier_name || 'غير معروف';
+        if (!supplierMap[sName]) supplierMap[sName] = { total: 0, count: 0, unpaid: 0 };
+        supplierMap[sName].total += Number(p.total_amount) || 0;
+        supplierMap[sName].count += 1;
+        supplierMap[sName].unpaid += Number(p.remaining_amount) || 0;
+      });
+      const topSuppliers = Object.entries(supplierMap).sort((a, b) => b[1].total - a[1].total).slice(0, 5).map(([name, data]) => `- ${name}: إجمالي التعامل ${data.total}، عدد الفواتير: ${data.count}، غير مدفوع: ${data.unpaid}`).join('\n');
+
+      const totalPurchases = purchases.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0);
+      const unpaidPurchases = purchases.reduce((sum, p) => sum + (Number(p.remaining_amount) || 0), 0);
 
       const productsSummary = [
         ...topProducts.map(p => 
@@ -191,19 +360,40 @@ export default function AIEngine() {
 
       return `
 إحصائيات المحل (آخر 30 يوم — ${invoices.length} فاتورة — ${products.length} منتج):
-1. أكثر 5 منتجات بيعاً (حسب الكمية):
-${topByQty.length ? topByQty.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalQty} (أرباحه: ${p.totalProfit})`).join('\n') : 'لا يوجد'}
 
-2. أكثر 5 منتجات ربحاً:
-${topByProfit.length ? topByProfit.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalProfit} (الكمية: ${p.totalQty})`).join('\n') : 'لا يوجد'}
+1. 📊 المؤشرات المالية الرئيسية:
+الإيرادات: ${totalRevenue} | الأرباح: ${totalProfit} | هامش الربح: ${profitMargin}%
+متوسط قيمة الفاتورة: ${avgInvoiceValue}
+اتجاه المبيعات الأسبوعي: ${weeklyTrend === 'N/A' ? 'لا توجد بيانات كافية' : (Number(weeklyTrend) >= 0 ? `↑ صعود بنسبة ${weeklyTrend}%` : `↓ هبوط بنسبة ${weeklyTrend}%`)}
+أفضل يوم مبيعاً: ${bestDay ? `${bestDay[0]} بمبلغ ${bestDay[1]}` : 'لا يوجد'}
 
-3. منتجات قريبة من النفاد:
-${lowStock.length ? lowStock.slice(0, 10).map(p => `- ${p.name_ar}: متبقي ${p.stock_quantity}`).join('\n') : 'الكل في السليم'}
+2. 🏆 أكثر 5 منتجات بيعاً (حسب الكمية):
+${topByQty.length ? topByQty.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalQty} وحدة (ربح: ${p.totalProfit})`).join('\n') : 'لا يوجد'}
 
-4. المؤشرات المالية:
-الإيرادات: ${totalRevenue} | الأرباح: ${totalProfit} | الديون المعلقة: ${debtAmount}
+3. 💰 أكثر 5 منتجات ربحاً:
+${topByProfit.length ? topByProfit.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ربح ${p.totalProfit} (الكمية: ${p.totalQty})`).join('\n') : 'لا يوجد'}
 
-5. عينة من المخزون (أعلى و أدنى مبيعاً):
+4. 📦 منتجات قريبة من النفاد (${lowStock.length} منتج):
+${lowStock.length ? lowStock.slice(0, 10).map(p => `- ${p.name_ar}: متبقي ${p.stock_quantity} (الحد الأدنى: ${p.min_safety_stock || 0})`).join('\n') : 'الكل في مستوى آمن'}
+
+5. ⚠️ منتجات قريبة من انتهاء الصلاحية (${nearExpiry.length} منتج):
+${nearExpiry.length ? nearExpiry.slice(0, 10).map(p => `- ${p.name_ar}: تنتهي في ${p.expiry_date}`).join('\n') : 'لا يوجد منتجات قريبة من الانتهاء'}
+
+6. 📁 أكثر الفئات مبيعاً:
+${topCategories.length ? topCategories.map(([cat, data], i) => `${i + 1}. ${cat}: إيرادات ${data.revenue}، كمية ${data.qty}`).join('\n') : 'لا يوجد'}
+
+7. 👤 أكبر العملاء المديونين (${customerDebts.length} عميل، إجمالي: ${debtAmount}):
+${topDebtors || 'لا يوجد ديون للعملاء'}
+${overdueDebts.length > 0 ? `\n⚠️ ديون متأخرة عن موعدها: ${overdueDebts.length} دين` : ''}
+
+8. 🧾 أعلى 5 فواتير قيمة:
+${topInvoices || 'لا يوجد فواتير'}
+
+9. 🚚 أهم الموردين (${Object.keys(supplierMap).length} مورد):
+${topSuppliers || 'لا يوجد موردين'}
+إجمالي المشتريات: ${totalPurchases} | غير المدفوع للموردين: ${unpaidPurchases}
+
+10. 📋 عينة من المخزون (أعلى وأدنى مبيعاً):
 ${productsSummary}
 `;
     } catch (err) {
@@ -213,11 +403,11 @@ ${productsSummary}
   }, [db]);
 
   const generateStockInsight = useCallback(async () => {
-    setLoading(true);
+    setInsightLoading(true);
     const dbContext = await getDatabaseContext();
     if (!dbContext) {
       setInsight(t('no_insights'));
-      setLoading(false);
+      setInsightLoading(false);
       return;
     }
 
@@ -225,7 +415,7 @@ ${productsSummary}
 البيانات والإحصائيات:
 ${dbContext}
 
-قدم توصية استراتيجية واحدة فقط ذكية وموجزة جداً (أقل من 3 جمل) لتحسين المبيعات أو المخزون.`;
+قدم توصية استراتيجية واحدة فقط ذكية وموجزة جداً (أقل من 3 جمل) لتحسين المبيعات أو المخزون. ابدأ بإيموجي مناسب.`;
     
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: systemPrompt },
@@ -234,16 +424,15 @@ ${dbContext}
 
     const response = await fetchGroq(apiMessages);
     setInsight(response);
-    setLoading(false);
+    setInsightLoading(false);
   }, [fetchGroq, getDatabaseContext, t]);
 
   useEffect(() => {
     generateStockInsight();
   }, [generateStockInsight]);
 
-  const handleQuery = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query) return;
+  const submitQuery = useCallback(async (queryText: string) => {
+    if (!queryText.trim()) return;
 
     // Stop speech recognition if still active
     if (isRecording && recognitionRef.current) {
@@ -251,49 +440,78 @@ ${dbContext}
       setIsRecording(false);
     }
 
+    // Add user message
+    const userMsg: ChatMessage = { role: 'user', content: queryText.trim(), timestamp: Date.now() };
+    setMessages(prev => [...prev, userMsg]);
+    setQuery('');
     setLoading(true);
+
     const dbContext = await getDatabaseContext();
-    const systemInstruction = `أنت مساعد ذكي للمبيعات في محل تجاري.
-بيانات المحل:
+    const systemInstruction = `أنت مساعد ذكي ومستشار أعمال استراتيجي لمحل تجاري. اسمك "مساعد MARKET الذكي".
+بيانات المحل الحالية:
 ${dbContext}
 
-قواعد صارمة:
-1. أجب باختصار شديد ومباشرة (من 1 إلى 3 أسطر فقط). يُمنع سرد كافة المنتجات.
-2. إذا سئلت عن أكثر المنتجات بيعاً أو أرباحاً أو الأقل مبيعاً، اذكر المنتج والرقم المطلوبة فوراً.
-3. تذكر مجرى الحديث وأجب بناءً على الأسئلة السابقة إذا كان سؤال المستخدم مكملاً.
-4. باللغة العربية الفصحى.`;
+قواعد الإجابة:
+1. أجب بدقة ووضوح بناءً على البيانات الفعلية. استخدم أرقاماً محددة ونسباً مئوية عند الإمكان.
+2. عند السؤال عن أرقام أو أشخاص (مثل: أعلى فاتورة، أكثر زبون مديون، أفضل منتج): اذكر الاسم والرقم المحدد فوراً.
+3. عند السؤال الاستشاري (مثل: كيف أزيد المبيعات، كيف أحسن المخزون): قدّم 3 نصائح مرقمة عملية وقابلة للتنفيذ مبنية على بيانات المحل.
+4. أضف إيموجي مناسب في بداية كل نقطة رئيسية.
+5. إذا سُئلت عن ملخص أو تقرير، رتّب المعلومات بشكل منظم مع أقسام واضحة.
+6. تذكر مجرى الحديث وأجب بناءً على الأسئلة السابقة إذا كان السؤال مكملاً.
+7. الإجابات باللغة العربية الفصحى (إلا إذا سأل المستخدم بالإنجليزية).
+8. لا تخترع بيانات غير موجودة. إذا لم تتوفر معلومة، أخبر المستخدم بوضوح.`;
 
-    const userMessage = query;
-    
+    // Build conversation history for API (last 10 messages max)
+    const recentMessages = [...messages, userMsg].slice(-10);
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: systemInstruction },
-      ...chatHistory,
-      { role: 'user', content: userMessage }
+      ...recentMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
     const response = await fetchGroq(apiMessages);
     
-    setInsight(response);
-    
-    setChatHistory(prev => {
-      const newHistory = [...prev, { role: 'user' as const, content: userMessage }, { role: 'assistant' as const, content: response }];
-      if (newHistory.length > 8) return newHistory.slice(newHistory.length - 8);
-      return newHistory;
-    });
-
-    setQuery('');
+    const assistantMsg: ChatMessage = { role: 'assistant', content: response, timestamp: Date.now() };
+    setMessages(prev => [...prev, assistantMsg]);
     setLoading(false);
+  }, [messages, isRecording, getDatabaseContext, fetchGroq]);
+
+  const handleQuery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    await submitQuery(query);
+  };
+
+  const handleSuggestedQuestion = async (questionAr: string, questionEn: string) => {
+    const q = isAr ? questionAr : questionEn;
+    setExpandedCategory(null);
+    await submitQuery(q);
+  };
+
+  const clearChat = () => {
+    setMessages([]);
   };
 
   return (
     <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20 dark:border-purple-400/20 rounded-xl p-6 shadow-sm mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-[var(--color-primary)] text-white rounded-lg shadow-lg shadow-purple-500/30">
-          <BrainCircuit size={24} />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-[var(--color-primary)] text-white rounded-lg shadow-lg shadow-purple-500/30">
+            <BrainCircuit size={24} />
+          </div>
+          <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400">
+            {t('ai_engine_title')}
+          </h3>
         </div>
-        <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400">
-          {t('ai_engine_title')}
-        </h3>
+        {messages.length > 0 && (
+          <button
+            onClick={clearChat}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+            title={isAr ? 'مسح المحادثة' : 'Clear chat'}
+          >
+            <Trash2 size={14} />
+            {isAr ? 'مسح المحادثة' : 'Clear chat'}
+          </button>
+        )}
       </div>
 
       {showAiWarning && (
@@ -302,12 +520,12 @@ ${dbContext}
             <AlertCircle size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-1.5">
               <p className="leading-relaxed font-bold">
-                {i18n.language.startsWith('ar') 
+                {isAr 
                   ? 'مفتاح الذكاء الاصطناعي مفقود!' 
                   : 'AI Key is missing!'}
               </p>
               <p className="leading-relaxed text-xs opacity-90">
-                {i18n.language.startsWith('ar') 
+                {isAr 
                   ? 'لكي تتمكن من استخدام ميزة الذكاء الاصطناعي، يرجى الانتقال إلى الإعدادات وإضافة مفتاح Groq مجاناً بخطوات بسيطة مشروحة هناك.' 
                   : 'To use the AI feature, please go to Settings and add a free Groq key using the simple steps provided there.'}
               </p>
@@ -316,10 +534,10 @@ ${dbContext}
                   to="/settings" 
                   className="inline-flex items-center gap-1 font-bold text-[var(--color-primary)] hover:underline bg-[var(--color-primary)]/10 px-3 py-1.5 rounded-lg w-fit"
                 >
-                  {i18n.language.startsWith('ar') ? 'انتقل للإعدادات لتفعيل المفتاح 👈' : 'Go to Settings 👈'}
+                  {isAr ? 'انتقل للإعدادات لتفعيل المفتاح 👈' : 'Go to Settings 👈'}
                 </Link>
                 <span className="text-xs opacity-80 mt-1 sm:mt-0 font-medium bg-black/5 dark:bg-white/5 px-2 py-1.5 rounded-lg">
-                  {i18n.language.startsWith('ar') 
+                  {isAr 
                     ? 'أو تواصل معنا للمساعدة عبر الواتساب/تليجرام: 009647510171376' 
                     : 'Or contact us via WhatsApp/Telegram: 009647510171376'}
                 </span>
@@ -336,65 +554,168 @@ ${dbContext}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Natural Language Query Engine */}
-        <div className="space-y-4 bg-white/60 dark:bg-[#16171d]/60 p-4 rounded-xl border border-black/5 dark:border-white/5 backdrop-blur-sm">
-          <h4 className="font-semibold flex items-center gap-2">
-            <Sparkles size={18} className="text-blue-500" />
-            {t('db_search_title')}
+      {/* Smart Insight Card */}
+      <div className="mb-4 bg-white/60 dark:bg-[#16171d]/60 p-4 rounded-xl border border-black/5 dark:border-white/5 backdrop-blur-sm">
+        <h4 className="font-semibold flex items-center gap-2 mb-2">
+          <Sparkles size={18} className="text-orange-500" />
+          {t('stock_insights_title')}
+        </h4>
+        <div className="p-3 rounded-lg bg-white dark:bg-[#1f2028] border border-black/5 dark:border-white/5 shadow-inner min-h-[48px] flex items-center">
+          {insightLoading ? (
+            <div className="w-full flex justify-center">
+              <div className="animate-pulse flex gap-1">
+                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                 <div className="w-2 h-2 bg-orange-500 rounded-full delay-75"></div>
+                 <div className="w-2 h-2 bg-orange-500 rounded-full delay-150"></div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm leading-relaxed whitespace-pre-line">{insight || t('no_insights')}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Chat Interface */}
+      <div className="bg-white/60 dark:bg-[#16171d]/60 rounded-xl border border-black/5 dark:border-white/5 backdrop-blur-sm overflow-hidden">
+        {/* Chat Header */}
+        <div className="px-4 py-3 border-b border-black/5 dark:border-white/5 flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <h4 className="font-semibold text-sm">
+            {isAr ? 'الدردشة مع المساعد الذكي' : 'Chat with AI Assistant'}
           </h4>
+        </div>
+
+        {/* Messages Area */}
+        <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto min-h-[120px]" style={{ scrollBehavior: 'smooth' }}>
+          {messages.length === 0 && !loading && (
+            <div className="text-center py-8 text-gray-400 dark:text-gray-500">
+              <Bot size={40} className="mx-auto mb-3 opacity-50" />
+              <p className="text-sm font-medium">
+                {isAr ? 'مرحباً! أنا مساعد MARKET الذكي 👋' : 'Hello! I\'m MARKET AI Assistant 👋'}
+              </p>
+              <p className="text-xs mt-1 opacity-75">
+                {isAr ? 'اسألني أي سؤال عن محلك، أو اختر من الأسئلة المقترحة بالأسفل' : 'Ask me anything about your store, or pick from the suggested questions below'}
+              </p>
+            </div>
+          )}
+
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'assistant' && (
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mt-1">
+                  <Bot size={14} className="text-white" />
+                </div>
+              )}
+              <div
+                className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                  msg.role === 'user'
+                    ? 'bg-[var(--color-primary)] text-white rounded-br-md'
+                    : 'bg-gray-100 dark:bg-[#1f2028] border border-black/5 dark:border-white/5 rounded-bl-md'
+                }`}
+              >
+                {msg.content}
+              </div>
+              {msg.role === 'user' && (
+                <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mt-1">
+                  <User size={14} className="text-gray-600 dark:text-gray-300" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {loading && (
+            <div className="flex gap-2 justify-start">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mt-1">
+                <Bot size={14} className="text-white" />
+              </div>
+              <div className="bg-gray-100 dark:bg-[#1f2028] border border-black/5 dark:border-white/5 rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-3 border-t border-black/5 dark:border-white/5">
           <form onSubmit={handleQuery} className="relative flex items-center gap-2">
             <div className="relative flex-1">
               <input 
+                ref={inputRef}
                 type="text" 
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder={isRecording ? (i18n.language.startsWith('ar') ? 'جاري الاستماع...' : 'Listening...') : t('db_search_placeholder')} 
-                disabled={showAiWarning}
-                className="w-full pl-4 pr-12 py-3 rounded-lg bg-white dark:bg-[#1f2028] shadow-sm border border-transparent focus:border-blue-500 outline-none transition-all disabled:opacity-50"
+                placeholder={isRecording ? (isAr ? 'جاري الاستماع...' : 'Listening...') : (isAr ? 'اكتب سؤالك هنا...' : 'Type your question here...')} 
+                disabled={showAiWarning || loading}
+                className="w-full pl-4 pr-12 py-3 rounded-xl bg-gray-50 dark:bg-[#1a1b22] shadow-sm border border-transparent focus:border-purple-500 outline-none transition-all disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={toggleRecording}
-                disabled={showAiWarning}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${isRecording ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-gray-400 hover:text-blue-500 hover:bg-blue-500/10'}`}
-                title={i18n.language.startsWith('ar') ? 'تحدث بالصوت' : 'Speak'}
+                disabled={showAiWarning || loading}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${isRecording ? 'text-red-500 bg-red-500/10 animate-pulse' : 'text-gray-400 hover:text-purple-500 hover:bg-purple-500/10'}`}
+                title={isAr ? 'تحدث بالصوت' : 'Speak'}
               >
                 {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
               </button>
             </div>
             <button 
               type="submit" 
-              disabled={loading || !query || showAiWarning}
-              className="p-3 bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-blue-500/20"
+              disabled={loading || !query.trim() || showAiWarning}
+              className="p-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-purple-500/20 active:scale-95"
             >
               <Send size={18} />
             </button>
           </form>
-          <p className="text-xs text-gray-500 mt-2">
-            {t('db_search_desc')}
-          </p>
         </div>
+      </div>
 
-        {/* AI Smart Stock Advisor */}
-        <div className="space-y-4 bg-white/60 dark:bg-[#16171d]/60 p-4 rounded-xl border border-black/5 dark:border-white/5 backdrop-blur-sm flex flex-col">
-          <h4 className="font-semibold flex items-center gap-2">
-            <AlertCircle size={18} className="text-orange-500" />
-            {t('stock_insights_title')}
-          </h4>
-          <div className="flex-1 p-4 rounded-lg bg-white dark:bg-[#1f2028] border border-black/5 dark:border-white/5 shadow-inner min-h-[100px] flex items-center">
-            {loading ? (
-              <div className="w-full flex justify-center">
-                <div className="animate-pulse flex gap-1">
-                   <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                   <div className="w-2 h-2 bg-orange-500 rounded-full delay-75"></div>
-                   <div className="w-2 h-2 bg-orange-500 rounded-full delay-150"></div>
-                </div>
+      {/* Suggested Questions - Categorized */}
+      <div className="mt-4 space-y-2">
+        <p className="text-xs text-gray-500 font-medium px-1">
+          {isAr ? '💡 أسئلة مقترحة — اضغط على الفئة لعرض الأسئلة:' : '💡 Suggested questions — click a category to expand:'}
+        </p>
+        <div className="space-y-1.5">
+          {questionCategories.map((cat, catIdx) => {
+            const colors = colorMap[cat.color];
+            const isExpanded = expandedCategory === catIdx;
+            return (
+              <div key={catIdx} className={`rounded-xl border ${colors.border} overflow-hidden transition-all`}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedCategory(isExpanded ? null : catIdx)}
+                  disabled={loading || showAiWarning}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium ${colors.bg} ${colors.text} ${colors.hover} transition-colors cursor-pointer disabled:opacity-50`}
+                >
+                  <span className="flex items-center gap-2">
+                    {cat.icon}
+                    {isAr ? cat.labelAr : cat.labelEn}
+                  </span>
+                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+                {isExpanded && (
+                  <div className="p-2 flex flex-wrap gap-1.5 bg-white/50 dark:bg-[#16171d]/50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    {cat.questions.map((q, qIdx) => (
+                      <button
+                        key={qIdx}
+                        type="button"
+                        disabled={loading || showAiWarning}
+                        onClick={() => handleSuggestedQuestion(q.ar, q.en)}
+                        className={`text-xs ${colors.bg} ${colors.hover} ${colors.text} px-3 py-1.5 rounded-full transition-colors cursor-pointer border ${colors.border} disabled:opacity-50`}
+                      >
+                        {isAr ? q.ar : q.en}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <p className="text-sm leading-relaxed whitespace-pre-line">{insight || t('no_insights')}</p>
-            )}
-          </div>
+            );
+          })}
         </div>
       </div>
     </div>
