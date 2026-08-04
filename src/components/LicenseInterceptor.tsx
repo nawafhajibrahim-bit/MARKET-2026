@@ -435,6 +435,11 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                  <p className="text-sm opacity-80 leading-relaxed">
                      {t('license_missing_desc') || 'رخصة برنامجك مفقودة أو منتهية الصلاحية. يرجى إدخال مفتاح ترخيص صالح أدناه أو بدء الفترة التجريبية.'}
                  </p>
+                 <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 p-2.5 rounded-lg border border-orange-500/20 leading-relaxed">
+                     {isAr 
+                       ? '💡 تنبيه: الترخيص وقاعدة البيانات يرتبطان بجهاز واحد فقط (محلياً). تشغيل البرنامج على متصفح أو جهاز آخر لا يتيح مشاركة نفس البيانات تلقائياً.'
+                       : '💡 Note: The license and database are bound to a single device (locally). Running the app on another browser or device will not automatically share the same data.'}
+                 </p>
 
                  {/* Owner Contact Card */}
                  <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-xl text-center space-y-2">
