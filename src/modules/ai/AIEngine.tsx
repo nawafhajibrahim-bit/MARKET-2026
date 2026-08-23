@@ -275,14 +275,14 @@ export default function AIEngine() {
           }
           const retryData = await retry.json();
           const rawContent = retryData.choices?.[0]?.message?.content || t('ai_no_response');
-          return rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+          return rawContent.replace(/<think>[\s\S]*?(<\/think>|$)/gi, '').trim();
         }
         return errMsg || t('ai_error_connect');
       }
 
       const data = await res.json();
       const rawContent = data.choices?.[0]?.message?.content || t('ai_no_response');
-      return rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      return rawContent.replace(/<think>[\s\S]*?(<\/think>|$)/gi, '').trim();
       
     } catch (e) {
       console.error(e);
