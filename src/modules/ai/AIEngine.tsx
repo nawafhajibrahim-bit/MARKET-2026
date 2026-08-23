@@ -20,14 +20,25 @@ interface QuestionCategory {
 
 // Preferred Groq models in priority order — auto-detection picks the first one available
 const PREFERRED_MODELS = [
-  'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'meta-llama/llama-4-maverick-17b-128e-instruct',
-  'llama3-70b-8192',
+  'llama-3.3-70b-versatile',
   'llama3-8b-8192',
+  'llama3-70b-8192',
   'gemma2-9b-it',
   'mixtral-8x7b-32768',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct',
+];
+
+// Models to skip — they have very low rate limits or are not suitable for general chat
+const BLOCKED_MODELS = [
+  'allam-2-7b',
+  'allam-2-7b-instruct',
+  'whisper-large-v3',
+  'whisper-large-v3-turbo',
+  'distil-whisper-large-v3-en',
+  'playai-tts',
+  'playai-tts-arabic',
 ];
 
 export default function AIEngine() {
@@ -191,16 +202,18 @@ export default function AIEngine() {
       });
       if (res.ok) {
         const data = await res.json();
-        const availableIds: string[] = (data.data || []).map((m: { id: string }) => m.id);
+        const availableIds: string[] = (data.data || [])
+          .map((m: { id: string }) => m.id)
+          .filter((id: string) => !BLOCKED_MODELS.includes(id));
         // Return first preferred model that is available
         const found = PREFERRED_MODELS.find(m => availableIds.includes(m));
         if (found) return found;
-        // Fallback: return first model that supports chat
+        // Fallback: return first non-blocked model
         if (availableIds.length > 0) return availableIds[0];
       }
     } catch { /* ignore, fall through */ }
     // Last resort: return the last known working default
-    return 'llama-3.3-70b-versatile';
+    return 'llama-3.1-8b-instant';
   }, []);
 
   const fetchGroq = useCallback(async (apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
@@ -211,8 +224,13 @@ export default function AIEngine() {
         return t('custom_key_required') || 'Please enter your Groq API Key in Settings to use the AI features.';
       }
 
-      // Determine model: use saved if set, otherwise auto-detect
+      // Determine model: use saved if set and not blocked, otherwise auto-detect
       let selectedModel = localStorage.getItem('ai_model') || '';
+      if (!selectedModel || BLOCKED_MODELS.includes(selectedModel)) {
+        // Clear bad model and auto-detect
+        localStorage.removeItem('ai_model');
+        selectedModel = '';
+      }
       
       // VIP Business Route: Direct call to Groq
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
