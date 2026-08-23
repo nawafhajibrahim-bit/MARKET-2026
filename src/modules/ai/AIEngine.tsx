@@ -18,6 +18,18 @@ interface QuestionCategory {
   questions: { ar: string; en: string }[];
 }
 
+// Preferred Groq models in priority order — auto-detection picks the first one available
+const PREFERRED_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
+  'gemma2-9b-it',
+  'mixtral-8x7b-32768',
+];
+
 export default function AIEngine() {
   const { t, i18n } = useTranslation();
   const isAr = i18n.language.startsWith('ar');
@@ -171,30 +183,37 @@ export default function AIEngine() {
     localStorage.setItem('dismiss_ai_warning', 'true');
   };
 
+  const getWorkingModel = useCallback(async (apiKey: string): Promise<string> => {
+    // Try to fetch available models from Groq
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const availableIds: string[] = (data.data || []).map((m: { id: string }) => m.id);
+        // Return first preferred model that is available
+        const found = PREFERRED_MODELS.find(m => availableIds.includes(m));
+        if (found) return found;
+        // Fallback: return first model that supports chat
+        if (availableIds.length > 0) return availableIds[0];
+      }
+    } catch { /* ignore, fall through */ }
+    // Last resort: return the last known working default
+    return 'llama-3.3-70b-versatile';
+  }, []);
+
   const fetchGroq = useCallback(async (apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
     const customKey = localStorage.getItem('custom_groq_key') || '';
-    let selectedModel = localStorage.getItem('ai_model') || 'meta-llama/llama-4-scout-17b-16e-instruct';
-    // Migrate deprecated models to current alternatives
-    if (
-      selectedModel === 'llama3-8b-8192' ||
-      selectedModel === 'llama-3.1-8b-instant' ||
-      selectedModel === 'llama-3.3-8b-instant'
-    ) {
-      selectedModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
-      localStorage.setItem('ai_model', selectedModel);
-    } else if (
-      selectedModel === 'llama3-70b-8192' ||
-      selectedModel === 'llama-3.3-70b-versatile'
-    ) {
-      selectedModel = 'meta-llama/llama-4-maverick-17b-128e-instruct';
-      localStorage.setItem('ai_model', selectedModel);
-    }
 
     try {
       if (!customKey) {
         return t('custom_key_required') || 'Please enter your Groq API Key in Settings to use the AI features.';
       }
 
+      // Determine model: use saved if set, otherwise auto-detect
+      let selectedModel = localStorage.getItem('ai_model') || '';
+      
       // VIP Business Route: Direct call to Groq
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -203,15 +222,41 @@ export default function AIEngine() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: selectedModel,
+          model: selectedModel || 'llama-3.3-70b-versatile',
           messages: apiMessages,
           temperature: 0.3
         })
       });
 
+      // If model not found or not accessible, auto-detect and retry once
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        return errData.error?.message || t('ai_error_connect');
+        const errMsg: string = errData.error?.message || '';
+        if (errMsg.includes('does not exist') || errMsg.includes('not have access') || res.status === 404) {
+          // Auto-detect a working model
+          const workingModel = await getWorkingModel(customKey);
+          localStorage.setItem('ai_model', workingModel);
+          
+          const retry = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${customKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: workingModel,
+              messages: apiMessages,
+              temperature: 0.3
+            })
+          });
+          if (!retry.ok) {
+            const retryErr = await retry.json().catch(() => ({}));
+            return retryErr.error?.message || t('ai_error_connect');
+          }
+          const retryData = await retry.json();
+          return retryData.choices?.[0]?.message?.content || t('ai_no_response');
+        }
+        return errMsg || t('ai_error_connect');
       }
 
       const data = await res.json();
@@ -221,7 +266,7 @@ export default function AIEngine() {
       console.error(e);
       return t('ai_error_connect');
     }
-  }, [t]);
+  }, [t, getWorkingModel]);
 
   const getDatabaseContext = useCallback(async () => {
     try {
