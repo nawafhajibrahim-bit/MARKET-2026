@@ -397,11 +397,8 @@ export default function AIEngine() {
         .filter(d => d.type === 'Customer Debt' || !d.type)
         .map(d => ({ ...d, netDebt: (Number(d.amount) || 0) - (Number(d.paid_amount) || 0) }))
         .sort((a, b) => b.netDebt - a.netDebt);
-      const topDebtors = customerDebts.slice(0, 5).map(d => `- ${d.client_supplier_name}: عليه ${d.netDebt} (الإجمالي: ${d.amount}${d.due_date ? `، الاستحقاق: ${d.due_date}` : ''})`).join('\n');
+      const topDebtorsCompact = customerDebts.slice(0, 5).map(d => `${d.client_supplier_name}(${d.netDebt})`).join(' | ');
       const overdueDebts = debts.filter(d => d.due_date && new Date(d.due_date) < now && d.status !== 'Paid');
-
-      // Top Invoices
-      const topInvoices = [...invoices].sort((a, b) => Number(b.total_amount) - Number(a.total_amount)).slice(0, 5).map(inv => `- فاتورة رقم ${inv.invoice_id}: بقيمة ${inv.total_amount} (التاريخ: ${inv.timestamp?.substring(0, 10) || 'غير معروف'}، الربح: ${inv.actual_profit || 'غير محدد'})`).join('\n');
 
       // Top Suppliers
       const supplierMap: Record<string, { total: number; count: number; unpaid: number }> = {};
@@ -412,22 +409,10 @@ export default function AIEngine() {
         supplierMap[sName].count += 1;
         supplierMap[sName].unpaid += Number(p.remaining_amount) || 0;
       });
-      const topSuppliers = Object.entries(supplierMap).sort((a, b) => b[1].total - a[1].total).slice(0, 5).map(([name, data]) => `- ${name}: إجمالي التعامل ${data.total}، عدد الفواتير: ${data.count}، غير مدفوع: ${data.unpaid}`).join('\n');
+      const topSuppliersCompact = Object.entries(supplierMap).sort((a, b) => b[1].total - a[1].total).slice(0, 5).map(([name, data]) => `${name}(${data.total})`).join(' | ');
 
       const totalPurchases = purchases.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0);
       const unpaidPurchases = purchases.reduce((sum, p) => sum + (Number(p.remaining_amount) || 0), 0);
-
-      const productsSummary = [
-        ...topProducts.map(p => 
-          `- ${p.name_ar}: السعر=${p.sale_price}، التكلفة=${p.cost_price}، المتبقي=${p.stock_quantity}، المباع=${p.totalQty}، أرباحه=${p.totalProfit}`
-        ),
-        ...(bottomProducts.length > 0 ? [
-          '\n--- منتجات لم تُباع (عينة):',
-          ...bottomProducts.map(p => 
-            `- ${p.name_ar}: السعر=${p.sale_price}، المتبقي=${p.stock_quantity}`
-          )
-        ] : [])
-      ].join('\n');
 
       return `[بيانات المحل — آخر 30 يوم — ${invoices.length} فاتورة — ${products.length} منتج]
 
@@ -441,9 +426,9 @@ export default function AIEngine() {
 ⚠️ قريبة انتهاء (${nearExpiry.length}): ${nearExpiry.slice(0, 5).map(p => `${p.name_ar}(${p.expiry_date})`).join(' | ') || 'لا يوجد'}
 📁 أهم الفئات: ${topCategories.slice(0, 5).map(([cat, d], i) => `${i + 1}.${cat}(${d.revenue})`).join(' | ') || 'لا يوجد'}
 
-👤 أكبر المديونين (إجمالي=${debtAmount}): ${topDebtors || 'لا ديون'}${overdueDebts.length > 0 ? ` | متأخر: ${overdueDebts.length}` : ''}
+👤 أكبر المديونين (إجمالي=${debtAmount}): ${topDebtorsCompact || 'لا ديون'}${overdueDebts.length > 0 ? ` | متأخر: ${overdueDebts.length}` : ''}
 🧾 أعلى 5 فواتير: ${[...invoices].sort((a, b) => Number(b.total_amount) - Number(a.total_amount)).slice(0, 5).map(inv => `${inv.total_amount}(${inv.timestamp?.substring(0, 10)})`).join(' | ') || 'لا يوجد'}
-🚚 الموردون (${Object.keys(supplierMap).length}): ${topSuppliers || 'لا يوجد'} | مشتريات=${totalPurchases} | غير مدفوع=${unpaidPurchases}`;
+🚚 الموردون (${Object.keys(supplierMap).length}): ${topSuppliersCompact || 'لا يوجد'} | مشتريات=${totalPurchases} | غير مدفوع=${unpaidPurchases}`;
     } catch (err) {
       console.error('Failed to build db context', err);
       return '';
