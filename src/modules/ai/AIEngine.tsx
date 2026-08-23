@@ -429,44 +429,21 @@ export default function AIEngine() {
         ] : [])
       ].join('\n');
 
-      return `
-إحصائيات المحل (آخر 30 يوم — ${invoices.length} فاتورة — ${products.length} منتج):
+      return `[بيانات المحل — آخر 30 يوم — ${invoices.length} فاتورة — ${products.length} منتج]
 
-1. 📊 المؤشرات المالية الرئيسية:
-الإيرادات: ${totalRevenue} | الأرباح: ${totalProfit} | هامش الربح: ${profitMargin}%
-متوسط قيمة الفاتورة: ${avgInvoiceValue}
-اتجاه المبيعات الأسبوعي: ${weeklyTrend === 'N/A' ? 'لا توجد بيانات كافية' : (Number(weeklyTrend) >= 0 ? `↑ صعود بنسبة ${weeklyTrend}%` : `↓ هبوط بنسبة ${weeklyTrend}%`)}
-أفضل يوم مبيعاً: ${bestDay ? `${bestDay[0]} بمبلغ ${bestDay[1]}` : 'لا يوجد'}
+📊 المالية: إيرادات=${totalRevenue} | أرباح=${totalProfit} | هامش=${profitMargin}% | متوسط فاتورة=${avgInvoiceValue}
+📈 أسبوعي: هذا الأسبوع=${thisWeekRevenue} | الأسبوع الماضي=${lastWeekRevenue} | اتجاه=${weeklyTrend === 'N/A' ? 'غير محدد' : (Number(weeklyTrend) >= 0 ? `↑${weeklyTrend}%` : `↓${weeklyTrend}%`)}
+🗓️ أفضل يوم: ${bestDay ? `${bestDay[0]}=${bestDay[1]}` : 'لا يوجد'}
 
-2. 🏆 أكثر 5 منتجات بيعاً (حسب الكمية):
-${topByQty.length ? topByQty.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ${p.totalQty} وحدة (ربح: ${p.totalProfit})`).join('\n') : 'لا يوجد'}
+🏆 أكثر 5 مبيعاً: ${topByQty.slice(0, 5).map((p, i) => `${i + 1}.${p.name_ar}(${p.totalQty}وحدة،ربح=${p.totalProfit})`).join(' | ') || 'لا يوجد'}
+💰 أكثر 5 ربحاً: ${topByProfit.slice(0, 5).map((p, i) => `${i + 1}.${p.name_ar}(ربح=${p.totalProfit})`).join(' | ') || 'لا يوجد'}
+📦 مخزون منخفض (${lowStock.length}): ${lowStock.slice(0, 5).map(p => `${p.name_ar}(${p.stock_quantity})`).join(' | ') || 'لا يوجد'}
+⚠️ قريبة انتهاء (${nearExpiry.length}): ${nearExpiry.slice(0, 5).map(p => `${p.name_ar}(${p.expiry_date})`).join(' | ') || 'لا يوجد'}
+📁 أهم الفئات: ${topCategories.slice(0, 5).map(([cat, d], i) => `${i + 1}.${cat}(${d.revenue})`).join(' | ') || 'لا يوجد'}
 
-3. 💰 أكثر 5 منتجات ربحاً:
-${topByProfit.length ? topByProfit.slice(0, 5).map((p, i) => `${i + 1}. ${p.name_ar}: ربح ${p.totalProfit} (الكمية: ${p.totalQty})`).join('\n') : 'لا يوجد'}
-
-4. 📦 منتجات قريبة من النفاد (${lowStock.length} منتج):
-${lowStock.length ? lowStock.slice(0, 10).map(p => `- ${p.name_ar}: متبقي ${p.stock_quantity} (الحد الأدنى: ${p.min_safety_stock || 0})`).join('\n') : 'الكل في مستوى آمن'}
-
-5. ⚠️ منتجات قريبة من انتهاء الصلاحية (${nearExpiry.length} منتج):
-${nearExpiry.length ? nearExpiry.slice(0, 10).map(p => `- ${p.name_ar}: تنتهي في ${p.expiry_date}`).join('\n') : 'لا يوجد منتجات قريبة من الانتهاء'}
-
-6. 📁 أكثر الفئات مبيعاً:
-${topCategories.length ? topCategories.map(([cat, data], i) => `${i + 1}. ${cat}: إيرادات ${data.revenue}، كمية ${data.qty}`).join('\n') : 'لا يوجد'}
-
-7. 👤 أكبر العملاء المديونين (${customerDebts.length} عميل، إجمالي: ${debtAmount}):
-${topDebtors || 'لا يوجد ديون للعملاء'}
-${overdueDebts.length > 0 ? `\n⚠️ ديون متأخرة عن موعدها: ${overdueDebts.length} دين` : ''}
-
-8. 🧾 أعلى 5 فواتير قيمة:
-${topInvoices || 'لا يوجد فواتير'}
-
-9. 🚚 أهم الموردين (${Object.keys(supplierMap).length} مورد):
-${topSuppliers || 'لا يوجد موردين'}
-إجمالي المشتريات: ${totalPurchases} | غير المدفوع للموردين: ${unpaidPurchases}
-
-10. 📋 عينة من المخزون (أعلى وأدنى مبيعاً):
-${productsSummary}
-`;
+👤 أكبر المديونين (إجمالي=${debtAmount}): ${topDebtors || 'لا ديون'}${overdueDebts.length > 0 ? ` | متأخر: ${overdueDebts.length}` : ''}
+🧾 أعلى 5 فواتير: ${[...invoices].sort((a, b) => Number(b.total_amount) - Number(a.total_amount)).slice(0, 5).map(inv => `${inv.total_amount}(${inv.timestamp?.substring(0, 10)})`).join(' | ') || 'لا يوجد'}
+🚚 الموردون (${Object.keys(supplierMap).length}): ${topSuppliers || 'لا يوجد'} | مشتريات=${totalPurchases} | غير مدفوع=${unpaidPurchases}`;
     } catch (err) {
       console.error('Failed to build db context', err);
       return '';
@@ -518,22 +495,13 @@ ${dbContext}
     setLoading(true);
 
     const dbContext = await getDatabaseContext();
-    const systemInstruction = `أنت مساعد ذكي ومستشار أعمال استراتيجي لمحل تجاري. اسمك "مساعد MARKET الذكي".
-بيانات المحل الحالية:
-${dbContext}
+    const systemInstruction = `أنت مساعد ذكي لمحل تجاري اسمك "مساعد MARKET".
+بيانات المحل: ${dbContext}
 
-قواعد الإجابة:
-1. أجب بدقة ووضوح بناءً على البيانات الفعلية. استخدم أرقاماً محددة ونسباً مئوية عند الإمكان.
-2. عند السؤال عن أرقام أو أشخاص (مثل: أعلى فاتورة، أكثر زبون مديون، أفضل منتج): اذكر الاسم والرقم المحدد فوراً.
-3. عند السؤال الاستشاري (مثل: كيف أزيد المبيعات، كيف أحسن المخزون): قدّم 3 نصائح مرقمة عملية وقابلة للتنفيذ مبنية على بيانات المحل.
-4. أضف إيموجي مناسب في بداية كل نقطة رئيسية.
-5. إذا سُئلت عن ملخص أو تقرير، رتّب المعلومات بشكل منظم مع أقسام واضحة.
-6. تذكر مجرى الحديث وأجب بناءً على الأسئلة السابقة إذا كان السؤال مكملاً.
-7. الإجابات باللغة العربية الفصحى (إلا إذا سأل المستخدم بالإنجليزية).
-8. لا تخترع بيانات غير موجودة. إذا لم تتوفر معلومة، أخبر المستخدم بوضوح.`;
+قواعد: أجب بدقة بناءً على البيانات. اذكر الأرقام المحددة. عند الأسئلة الاستشارية قدّم 3 نصائح مرقمة. أضف إيموجي. الإجابة بالعربية. لا تخترع بيانات غير موجودة.`;
 
-    // Build conversation history for API (last 10 messages max)
-    const recentMessages = [...messages, userMsg].slice(-10);
+    // Build conversation history for API (last 4 messages max to save tokens)
+    const recentMessages = [...messages, userMsg].slice(-4);
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: systemInstruction },
       ...recentMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
