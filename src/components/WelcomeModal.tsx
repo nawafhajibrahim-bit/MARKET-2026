@@ -99,44 +99,46 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
         className="bg-white dark:bg-[#1f2028] text-[var(--text)] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         dir={isAr ? 'rtl' : 'ltr'}
       >
-        <div className="bg-[var(--color-primary)] text-white p-6 relative">
-          <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 flex items-center gap-2">
-            <div 
-              className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all text-xs cursor-pointer"
-              title={isAr ? 'تغيير اللغة / Change Language' : 'Change Language / تغيير اللغة'}
-            >
-              <Globe size={15} className="shrink-0" />
-              <select
-                value={i18n.language.split('-')[0]}
-                onChange={(e) => {
-                  const newLng = e.target.value;
-                  i18n.changeLanguage(newLng);
-                  document.documentElement.dir = newLng === 'ar' ? 'rtl' : 'ltr';
-                }}
-                className="bg-transparent border-none text-white outline-none cursor-pointer text-xs font-semibold focus:ring-0 pr-1 pl-1"
-                aria-label="Language / اللغة"
+        <div className="bg-[var(--color-primary)] text-white p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2.5 rounded-xl shrink-0">
+                <HelpCircle size={28} />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">{isAr ? 'التحديثات والمقترحات' : 'Updates & Feedback'}</h2>
+                <p className="text-white/80 text-xs sm:text-sm">{isAr ? 'تعرف على الجديد أو أرسل مقترحاتك للمطور.' : "See what's new or send feedback to the developer."}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div 
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all text-xs cursor-pointer"
+                title={isAr ? 'تغيير اللغة / Change Language' : 'Change Language / تغيير اللغة'}
               >
-                <option value="ar" className="bg-[#1f2028] text-white">العربية (Arabic)</option>
-                <option value="en" className="bg-[#1f2028] text-white">English (الإنجليزية)</option>
-              </select>
-            </div>
+                <Globe size={15} className="shrink-0" />
+                <select
+                  value={i18n.language.split('-')[0]}
+                  onChange={(e) => {
+                    const newLng = e.target.value;
+                    i18n.changeLanguage(newLng);
+                    document.documentElement.dir = newLng === 'ar' ? 'rtl' : 'ltr';
+                  }}
+                  className="bg-transparent border-none text-white outline-none cursor-pointer text-xs font-semibold focus:ring-0 px-0.5"
+                  aria-label="Language / اللغة"
+                >
+                  <option value="ar" className="bg-[#1f2028] text-white">العربية (Ar)</option>
+                  <option value="en" className="bg-[#1f2028] text-white">English (En)</option>
+                </select>
+              </div>
 
-            <button 
-              onClick={onClose}
-              className="p-1.5 hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
-              title={isAr ? 'إغلاق' : 'Close'}
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 pr-24 rtl:pr-0 rtl:pl-24 sm:pr-0 sm:rtl:pl-0">
-            <div className="bg-white/20 p-2.5 rounded-xl">
-              <HelpCircle size={28} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold">{isAr ? 'التحديثات والمقترحات' : 'Updates & Feedback'}</h2>
-              <p className="text-white/80 text-sm">{isAr ? 'تعرف على الجديد أو أرسل مقترحاتك للمطور.' : "See what's new or send feedback to the developer."}</p>
+              <button 
+                onClick={onClose}
+                className="p-1.5 hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
+                title={isAr ? 'إغلاق' : 'Close'}
+              >
+                <X size={20} />
+              </button>
             </div>
           </div>
         </div>
@@ -256,10 +258,14 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
                   <div className="bg-black/5 dark:bg-white/5 rounded-xl p-5">
                     <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
                       <Star className="text-yellow-500" size={20} />
-                      {config.ads_title || (isAr ? 'التحديثات الأخيرة' : 'Latest Updates')}
+                      {(!isAr && (!config.ads_title || config.ads_title === 'التحديثات الأخيرة')) 
+                        ? 'Latest Updates' 
+                        : (config.ads_title || (isAr ? 'التحديثات الأخيرة' : 'Latest Updates'))}
                     </h3>
                     <div className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                      {config.ads_text || (isAr ? 'لا توجد تحديثات جديدة حالياً.' : 'No new updates right now.')}
+                      {(!isAr && (!config.ads_text || config.ads_text === 'لا توجد تحديثات جديدة حالياً.')) 
+                        ? 'No new updates right now.' 
+                        : (config.ads_text || (isAr ? 'لا توجد تحديثات جديدة حالياً.' : 'No new updates right now.'))}
                     </div>
                   </div>
 
