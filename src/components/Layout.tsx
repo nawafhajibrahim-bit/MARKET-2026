@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb, MessageCircle, Globe } from 'lucide-react';
 import { WelcomeModal } from './WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDb } from '../database/Provider';
@@ -215,14 +215,21 @@ export const Layout = () => {
             </div>
           )}
 
-          <select
-            onChange={(e) => changeLanguage(e.target.value)}
-            value={i18n.language.split('-')[0]}
-            className="p-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent hover:border-black/10 dark:hover:border-white/10 outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-all cursor-pointer text-sm"
+          <div 
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[var(--color-primary)] transition-all"
+            title={i18n.language.startsWith('ar') ? 'تغيير اللغة / Change Language' : 'Change Language / تغيير اللغة'}
           >
-            <option value="en">English</option>
-            <option value="ar">العربية</option>
-          </select>
+            <Globe size={18} className="text-[var(--color-primary)] shrink-0" />
+            <select
+              onChange={(e) => changeLanguage(e.target.value)}
+              value={i18n.language.split('-')[0]}
+              aria-label="Language / اللغة"
+              className="bg-transparent border-none outline-none cursor-pointer text-sm font-semibold focus:ring-0 pr-1 pl-1 text-[var(--text)]"
+            >
+              <option value="ar" className="bg-white dark:bg-[#1f2028] text-gray-900 dark:text-white">العربية (Arabic)</option>
+              <option value="en" className="bg-white dark:bg-[#1f2028] text-gray-900 dark:text-white">English (الإنجليزية)</option>
+            </select>
+          </div>
           <select
             onChange={(e) => changeTheme(e.target.value)}
             value={theme}
