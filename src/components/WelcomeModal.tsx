@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Send, AlertTriangle, HelpCircle, Star, ExternalLink, PlayCircle, CheckCircle, HardDrive, Laptop, Bot, Download, MessageCircle } from 'lucide-react';
+import { X, Send, AlertTriangle, HelpCircle, Star, ExternalLink, PlayCircle, CheckCircle, HardDrive, Laptop, Bot, Download, MessageCircle, Globe } from 'lucide-react';
 // I'll import Telegram differently since Send is already imported
 import { Send as Telegram } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -100,13 +100,37 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
         dir={isAr ? 'rtl' : 'ltr'}
       >
         <div className="bg-[var(--color-primary)] text-white p-6 relative">
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 rtl:right-auto rtl:left-4 p-1.5 hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
-          >
-            <X size={20} />
-          </button>
-          <div className="flex items-center gap-3">
+          <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 flex items-center gap-2">
+            <div 
+              className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all text-xs cursor-pointer"
+              title={isAr ? 'تغيير اللغة / Change Language' : 'Change Language / تغيير اللغة'}
+            >
+              <Globe size={15} className="shrink-0" />
+              <select
+                value={i18n.language.split('-')[0]}
+                onChange={(e) => {
+                  const newLng = e.target.value;
+                  i18n.changeLanguage(newLng);
+                  document.documentElement.dir = newLng === 'ar' ? 'rtl' : 'ltr';
+                }}
+                className="bg-transparent border-none text-white outline-none cursor-pointer text-xs font-semibold focus:ring-0 pr-1 pl-1"
+                aria-label="Language / اللغة"
+              >
+                <option value="ar" className="bg-[#1f2028] text-white">العربية (Arabic)</option>
+                <option value="en" className="bg-[#1f2028] text-white">English (الإنجليزية)</option>
+              </select>
+            </div>
+
+            <button 
+              onClick={onClose}
+              className="p-1.5 hover:bg-white/20 rounded-xl transition-colors cursor-pointer"
+              title={isAr ? 'إغلاق' : 'Close'}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 pr-24 rtl:pr-0 rtl:pl-24 sm:pr-0 sm:rtl:pl-0">
             <div className="bg-white/20 p-2.5 rounded-xl">
               <HelpCircle size={28} />
             </div>
