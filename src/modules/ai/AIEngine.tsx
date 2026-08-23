@@ -272,13 +272,15 @@ export default function AIEngine() {
             return retryErr.error?.message || t('ai_error_connect');
           }
           const retryData = await retry.json();
-          return retryData.choices?.[0]?.message?.content || t('ai_no_response');
+          const rawContent = retryData.choices?.[0]?.message?.content || t('ai_no_response');
+          return rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         }
         return errMsg || t('ai_error_connect');
       }
 
       const data = await res.json();
-      return data.choices?.[0]?.message?.content || t('ai_no_response');
+      const rawContent = data.choices?.[0]?.message?.content || t('ai_no_response');
+      return rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       
     } catch (e) {
       console.error(e);
