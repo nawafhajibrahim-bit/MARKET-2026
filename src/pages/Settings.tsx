@@ -118,16 +118,11 @@ export const Settings = () => {
   });
   const [showInstructions, setShowInstructions] = useState(true);
   const [aiModel, setAiModel] = useState(() => {
-    let saved = localStorage.getItem('ai_model') || 'llama-3.3-70b-versatile';
-    // Migrate deprecated or thinking models to current alternatives
-    if (
-      saved.includes('llama-4') ||
-      saved.includes('deepseek') ||
-      saved.includes('allam') ||
-      saved.includes('qwen') ||
-      saved.includes('whisper')
-    ) {
-      saved = 'llama-3.3-70b-versatile';
+    let saved = localStorage.getItem('ai_model') || 'openai/gpt-oss-120b';
+    // The previous Llama choices were retired by Groq. Keep only the two
+    // supported models shown to the user, with GPT-OSS 120B as the default.
+    if (!['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(saved)) {
+      saved = 'openai/gpt-oss-120b';
       localStorage.setItem('ai_model', saved);
     }
     return saved;
@@ -1121,8 +1116,8 @@ export const Settings = () => {
                 onChange={(e) => handleModelChange(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all"
               >
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (الأفضل والأذكى - ممتاز جداً 🌟)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B (سريع وخفيف ⚡)</option>
+              <option value="openai/gpt-oss-120b">GPT-OSS 120B (الأفضل والأدق — الافتراضي 🌟)</option>
+              <option value="openai/gpt-oss-20b">GPT-OSS 20B (سريع للاستخدام اليومي ⚡)</option>
               </select>
             </div>
           </div>

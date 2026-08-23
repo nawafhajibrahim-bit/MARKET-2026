@@ -18,10 +18,10 @@ interface QuestionCategory {
   questions: { ar: string; en: string }[];
 }
 
-// Preferred Groq models in priority order — auto-detection picks the first one available
+// Current Groq production models in priority order. The first one is the default.
 const PREFERRED_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
 ];
 
 // Models to skip — they have very low rate limits, or are Reasoning models (which output <think> tags)
@@ -32,10 +32,17 @@ const BLOCKED_MODELS = [
   'allam-2-7b-instruct',
   'qwen-2.5-32b',
   'qwen-2.5-coder-32b',
-  'qwen/qwen3.6-27b',
   'whisper',
   'playai',
 ];
+
+const DEFAULT_MODEL = PREFERRED_MODELS[0];
+
+/** Never render private reasoning, even if a provider returns it inside message content. */
+const getDisplayContent = (content: unknown): string => String(content ?? '')
+  .replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+  .replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*$/gi, '')
+  .trim();
 
 export default function AIEngine() {
   const { t, i18n } = useTranslation();
@@ -208,7 +215,7 @@ export default function AIEngine() {
       }
     } catch { /* ignore, fall through */ }
     // Last resort: return the most stable free tier model
-    return 'llama-3.3-70b-versatile';
+    return DEFAULT_MODEL;
   }, []);
 
   const fetchGroq = useCallback(async (apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
@@ -219,12 +226,12 @@ export default function AIEngine() {
         return t('custom_key_required') || 'Please enter your Groq API Key in Settings to use the AI features.';
       }
 
-      // Determine model: use saved if set and not blocked, otherwise auto-detect
+      // Only models we explicitly expose in Settings may be used. This also
+      // migrates stored selections from discontinued models.
       let selectedModel = localStorage.getItem('ai_model') || '';
-      if (!selectedModel || BLOCKED_MODELS.some(blocked => selectedModel.toLowerCase().includes(blocked.toLowerCase()))) {
-        // Clear bad model and auto-detect
-        localStorage.removeItem('ai_model');
-        selectedModel = '';
+      if (!PREFERRED_MODELS.includes(selectedModel) || BLOCKED_MODELS.some(blocked => selectedModel.toLowerCase().includes(blocked.toLowerCase()))) {
+        selectedModel = DEFAULT_MODEL;
+        localStorage.setItem('ai_model', selectedModel);
       }
       
       // VIP Business Route: Direct call to Groq
@@ -235,9 +242,12 @@ export default function AIEngine() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: selectedModel || 'llama-3.3-70b-versatile',
+          model: selectedModel,
           messages: apiMessages,
-          temperature: 0.3
+          temperature: 0.2,
+          // Groq keeps reasoning out of the response body; only the final answer is returned.
+          reasoning_format: 'hidden',
+          reasoning_effort: 'low',
         })
       });
 
@@ -245,7 +255,7 @@ export default function AIEngine() {
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         const errMsg: string = errData.error?.message || '';
-        if (errMsg.includes('does not exist') || errMsg.includes('not have access') || res.status === 404) {
+        if (errMsg.includes('does not exist') || errMsg.includes('not have access') || res.status === 403 || res.status === 404) {
           // Auto-detect a working model
           const workingModel = await getWorkingModel(customKey);
           localStorage.setItem('ai_model', workingModel);
@@ -259,7 +269,9 @@ export default function AIEngine() {
             body: JSON.stringify({
               model: workingModel,
               messages: apiMessages,
-              temperature: 0.3
+              temperature: 0.2,
+              reasoning_format: 'hidden',
+              reasoning_effort: 'low',
             })
           });
           if (!retry.ok) {
@@ -267,25 +279,13 @@ export default function AIEngine() {
             return retryErr.error?.message || t('ai_error_connect');
           }
           const retryData = await retry.json();
-          let rawContent = retryData.choices?.[0]?.message?.content || t('ai_no_response');
-          if (rawContent.includes('</think>')) {
-            rawContent = rawContent.split('</think>')[1];
-          } else if (rawContent.includes('<think>')) {
-            rawContent = rawContent.split('<think>')[0];
-          }
-          return rawContent.trim();
+          return getDisplayContent(retryData.choices?.[0]?.message?.content) || t('ai_no_response');
         }
         return errMsg || t('ai_error_connect');
       }
 
       const data = await res.json();
-      let rawContent = data.choices?.[0]?.message?.content || t('ai_no_response');
-      if (rawContent.includes('</think>')) {
-        rawContent = rawContent.split('</think>')[1];
-      } else if (rawContent.includes('<think>')) {
-        rawContent = rawContent.split('<think>')[0];
-      }
-      return rawContent.trim();
+      return getDisplayContent(data.choices?.[0]?.message?.content) || t('ai_no_response');
       
     } catch (e) {
       console.error(e);
@@ -490,7 +490,7 @@ ${dbContext}
     const systemInstruction = `أنت مساعد ذكي لمحل تجاري اسمك "مساعد MARKET".
 بيانات المحل: ${dbContext}
 
-قواعد: أجب بدقة بناءً على البيانات. اذكر الأرقام المحددة. عند الأسئلة الاستشارية قدّم 3 نصائح مرقمة. أضف إيموجي. الإجابة بالعربية. لا تخترع بيانات غير موجودة. ممنوع طباعة تفكيرك الداخلي أو استخدام <think>. أجب مباشرة.`;
+قواعد ملزمة: أجب بدقة اعتماداً على البيانات أعلاه فقط، ولا تستخدم أي معلومة خارجها. اذكر الأرقام المحددة ومجالها الزمني. إذا كانت البيانات غير موجودة أو لا تكفي للإجابة، قل ذلك بوضوح ولا تخمّن. عند الأسئلة الاستشارية قدّم 3 نصائح مرقمة مرتبطة بالبيانات. أضف إيموجي واحداً مناسباً. الإجابة بالعربية وبالنتيجة النهائية فقط؛ لا تكتب التفكير أو التحليل الداخلي ولا تستخدم وسوم التفكير.`;
 
     // Build conversation history for API (last 4 messages max to save tokens)
     const recentMessages = [...messages, userMsg].slice(-4);
