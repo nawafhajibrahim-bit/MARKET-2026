@@ -295,15 +295,9 @@ export const POS = () => {
     });
   };
 
-  // Auto-close completed invoice preview modal after 30 seconds
+  // Removed auto-close for completed invoice so the user can review/print at their own pace
   useEffect(() => {
-    if (completedInvoice) {
-      const timer = setTimeout(() => {
-        setCompletedInvoice(null);
-        setCompletedCart([]);
-      }, 30000);
-      return () => clearTimeout(timer);
-    }
+    // Intentionally empty: The user must explicitly click "Close & New Sale" to dismiss the modal
   }, [completedInvoice]);
 
   const officialCurrency = getOfficialCurrency();
