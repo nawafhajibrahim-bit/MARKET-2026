@@ -1,12 +1,16 @@
 {
-  "version": "1.4.4",
-  "release_date": "2026-07-16",
+  "version": "1.4.5",
+  "release_date": "2026-08-23",
   "changelog_ar": [
+    "تحديث مساعد الذكاء الاصطناعي إلى نماذج Groq المدعومة وإخفاء محتوى التفكير الداخلي.",
+    "تحسين دقة إجابات المساعد ومنع التخمين عند عدم توفر بيانات كافية.",
     "تحسين نموذج طلب الاشتراك لإلزام كتابة النداء الدولي في رقم الهاتف.",
     "إضافة ميزة تصدير البيانات إلى ملف إكسل (Excel).",
     "تحسين واجهة شريط التنقل لتتناسب مع جميع الشاشات والأحجام."
   ],
   "changelog_en": [
+    "Updated the AI assistant to supported Groq models and hid internal reasoning content.",
+    "Improved answer accuracy and prevented guesses when data is insufficient.",
     "Improved subscription request form to enforce international phone codes.",
     "Added feature to export data to Excel (xlsx).",
     "Responsive layout improvements for the top navigation bar."
