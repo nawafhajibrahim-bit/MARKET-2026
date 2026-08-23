@@ -20,28 +20,21 @@ interface QuestionCategory {
 
 // Preferred Groq models in priority order — auto-detection picks the first one available
 const PREFERRED_MODELS = [
-  'llama-3.1-8b-instant',
   'llama-3.3-70b-versatile',
-  'llama3-8b-8192',
-  'llama3-70b-8192',
-  'gemma2-9b-it',
-  'mixtral-8x7b-32768',
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'meta-llama/llama-4-maverick-17b-128e-instruct',
+  'llama-3.1-8b-instant',
 ];
 
-// Models to skip — they have very low rate limits or are not suitable for general chat
+// Models to skip — they have very low rate limits, or are Reasoning models (which output <think> tags)
 const BLOCKED_MODELS = [
+  'llama-4',
+  'deepseek',
   'allam-2-7b',
   'allam-2-7b-instruct',
   'qwen-2.5-32b',
   'qwen-2.5-coder-32b',
   'qwen/qwen3.6-27b',
-  'whisper-large-v3',
-  'whisper-large-v3-turbo',
-  'distil-whisper-large-v3-en',
-  'playai-tts',
-  'playai-tts-arabic',
+  'whisper',
+  'playai',
 ];
 
 export default function AIEngine() {
@@ -207,7 +200,7 @@ export default function AIEngine() {
         const data = await res.json();
         const availableIds: string[] = (data.data || [])
           .map((m: { id: string }) => m.id)
-          .filter((id: string) => !BLOCKED_MODELS.includes(id));
+          .filter((id: string) => !BLOCKED_MODELS.some(blocked => id.toLowerCase().includes(blocked.toLowerCase())));
         // Return ONLY preferred models. Never fallback to random unknown models
         // because they often have tiny rate limits (e.g. qwen, allam).
         const found = PREFERRED_MODELS.find(m => availableIds.includes(m));
@@ -228,7 +221,7 @@ export default function AIEngine() {
 
       // Determine model: use saved if set and not blocked, otherwise auto-detect
       let selectedModel = localStorage.getItem('ai_model') || '';
-      if (!selectedModel || BLOCKED_MODELS.includes(selectedModel)) {
+      if (!selectedModel || BLOCKED_MODELS.some(blocked => selectedModel.toLowerCase().includes(blocked.toLowerCase()))) {
         // Clear bad model and auto-detect
         localStorage.removeItem('ai_model');
         selectedModel = '';
