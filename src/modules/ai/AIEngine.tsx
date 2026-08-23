@@ -173,12 +173,20 @@ export default function AIEngine() {
 
   const fetchGroq = useCallback(async (apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {
     const customKey = localStorage.getItem('custom_groq_key') || '';
-    let selectedModel = localStorage.getItem('ai_model') || 'llama-3.1-8b-instant';
-    if (selectedModel === 'llama3-8b-8192') {
-      selectedModel = 'llama-3.1-8b-instant';
+    let selectedModel = localStorage.getItem('ai_model') || 'meta-llama/llama-4-scout-17b-16e-instruct';
+    // Migrate deprecated models to current alternatives
+    if (
+      selectedModel === 'llama3-8b-8192' ||
+      selectedModel === 'llama-3.1-8b-instant' ||
+      selectedModel === 'llama-3.3-8b-instant'
+    ) {
+      selectedModel = 'meta-llama/llama-4-scout-17b-16e-instruct';
       localStorage.setItem('ai_model', selectedModel);
-    } else if (selectedModel === 'llama3-70b-8192') {
-      selectedModel = 'llama-3.3-70b-versatile';
+    } else if (
+      selectedModel === 'llama3-70b-8192' ||
+      selectedModel === 'llama-3.3-70b-versatile'
+    ) {
+      selectedModel = 'meta-llama/llama-4-maverick-17b-128e-instruct';
       localStorage.setItem('ai_model', selectedModel);
     }
 

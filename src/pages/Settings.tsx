@@ -118,12 +118,20 @@ export const Settings = () => {
   });
   const [showInstructions, setShowInstructions] = useState(true);
   const [aiModel, setAiModel] = useState(() => {
-    let saved = localStorage.getItem('ai_model') || 'llama-3.1-8b-instant';
-    if (saved === 'llama3-8b-8192') {
-      saved = 'llama-3.1-8b-instant';
+    let saved = localStorage.getItem('ai_model') || 'meta-llama/llama-4-scout-17b-16e-instruct';
+    // Migrate deprecated models to current alternatives
+    if (
+      saved === 'llama3-8b-8192' ||
+      saved === 'llama-3.1-8b-instant' ||
+      saved === 'llama-3.3-8b-instant'
+    ) {
+      saved = 'meta-llama/llama-4-scout-17b-16e-instruct';
       localStorage.setItem('ai_model', saved);
-    } else if (saved === 'llama3-70b-8192') {
-      saved = 'llama-3.3-70b-versatile';
+    } else if (
+      saved === 'llama3-70b-8192' ||
+      saved === 'llama-3.3-70b-versatile'
+    ) {
+      saved = 'meta-llama/llama-4-maverick-17b-128e-instruct';
       localStorage.setItem('ai_model', saved);
     }
     return saved;
@@ -1117,8 +1125,8 @@ export const Settings = () => {
                 onChange={(e) => handleModelChange(e.target.value)}
                 className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer transition-all"
               >
-                <option value="llama-3.1-8b-instant">Llama 3.1 8B (llama-3.1-8b-instant)</option>
-                <option value="llama-3.3-70b-versatile">Llama 3.3 70B (llama-3.3-70b-versatile) - VIP</option>
+              <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B (سريع ومجاني ✅)</option>
+              <option value="meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick 17B (أقوى - VIP 🔥)</option>
               </select>
             </div>
           </div>
