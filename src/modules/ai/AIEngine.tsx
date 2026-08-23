@@ -390,15 +390,6 @@ export default function AIEngine() {
       expiryThreshold.setDate(expiryThreshold.getDate() + 30);
       const nearExpiry = products.filter(p => p.expiry_date && new Date(p.expiry_date) <= expiryThreshold && new Date(p.expiry_date) >= now);
 
-      // Top 10 and bottom 10 products
-      const topProducts = analytics
-        .filter(p => p.totalQty > 0)
-        .sort((a, b) => b.totalQty - a.totalQty)
-        .slice(0, 10);
-      const bottomProducts = analytics
-        .filter(p => p.totalQty === 0 && p.stock_quantity > 0)
-        .slice(0, 10);
-
       // Top Debtors
       const customerDebts = debts
         .filter(d => d.type === 'Customer Debt' || !d.type)
