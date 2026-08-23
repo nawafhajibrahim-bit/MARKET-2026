@@ -115,6 +115,10 @@ export const POS = () => {
   const completedRef = useRef(completedInvoice);
   const tRef = useRef(t);
   const showShortcutsPanelRef = useRef(showShortcutsPanel);
+
+  // Must be declared here so setShowConverter is in scope when handlersRef is created
+  const [showConverter, setShowConverter] = useState(false);
+
   const handlersRef = useRef({
     handleQuantityChange,
     handleRemoveFromCart,
@@ -124,7 +128,7 @@ export const POS = () => {
     setSelectedCartIndex,
     setSearchTerm,
     setShowShortcutsPanel,
-    setShowConverter: (_fn: ((prev: boolean) => boolean) | boolean) => {},
+    setShowConverter,
   });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,8 +308,6 @@ export const POS = () => {
   const defaultRate = getPOSExchangeRate();
   const currenciesList = getCurrenciesList();
 
-  // Helper Calculator State
-  const [showConverter, setShowConverter] = useState(false);
   const [helperCurrencyCode, setHelperCurrencyCodeState] = useState(() => {
     return getPOSHelperCurrency();
   });
@@ -1185,12 +1187,9 @@ export const POS = () => {
                     const paidOfficialVal = Number(paidOfficial) || 0;
                     const paidHelperVal = Number(paidHelper) || 0;
 
-                    let paidHelperInOfficial = 0;
-                    if (rateBaseCode === helperCurrencyCode) {
-                      paidHelperInOfficial = paidHelperVal * customRate;
-                    } else {
-                      paidHelperInOfficial = customRate > 0 ? paidHelperVal / customRate : 0;
-                    }
+                    const paidHelperInOfficial = rateBaseCode === helperCurrencyCode
+                      ? paidHelperVal * customRate
+                      : (customRate > 0 ? paidHelperVal / customRate : 0);
 
                     const totalPaidInOfficial = paidOfficialVal + paidHelperInOfficial;
                     const remainingInOfficial = finalTotal - totalPaidInOfficial;

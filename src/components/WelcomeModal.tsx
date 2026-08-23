@@ -84,7 +84,7 @@ export const WelcomeModal = ({ isOpen, onClose }: WelcomeModalProps) => {
       } else {
         alert(isAr ? 'حدث خطأ أثناء الإرسال' : 'Failed to send feedback');
       }
-    } catch (err) {
+    } catch (_err) {
       alert(isAr ? 'خطأ في الاتصال' : 'Network error');
     } finally {
       setFeedbackLoading(false);
