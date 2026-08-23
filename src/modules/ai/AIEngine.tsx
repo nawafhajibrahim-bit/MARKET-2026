@@ -274,15 +274,25 @@ export default function AIEngine() {
             return retryErr.error?.message || t('ai_error_connect');
           }
           const retryData = await retry.json();
-          const rawContent = retryData.choices?.[0]?.message?.content || t('ai_no_response');
-          return rawContent.replace(/<think>[\s\S]*?(<\/think>|$)/gi, '').trim();
+          let rawContent = retryData.choices?.[0]?.message?.content || t('ai_no_response');
+          if (rawContent.includes('</think>')) {
+            rawContent = rawContent.split('</think>')[1];
+          } else if (rawContent.includes('<think>')) {
+            rawContent = rawContent.split('<think>')[0];
+          }
+          return rawContent.trim();
         }
         return errMsg || t('ai_error_connect');
       }
 
       const data = await res.json();
-      const rawContent = data.choices?.[0]?.message?.content || t('ai_no_response');
-      return rawContent.replace(/<think>[\s\S]*?(<\/think>|$)/gi, '').trim();
+      let rawContent = data.choices?.[0]?.message?.content || t('ai_no_response');
+      if (rawContent.includes('</think>')) {
+        rawContent = rawContent.split('</think>')[1];
+      } else if (rawContent.includes('<think>')) {
+        rawContent = rawContent.split('<think>')[0];
+      }
+      return rawContent.trim();
       
     } catch (e) {
       console.error(e);
@@ -452,7 +462,7 @@ export default function AIEngine() {
 البيانات والإحصائيات:
 ${dbContext}
 
-قدم توصية استراتيجية واحدة فقط ذكية وموجزة جداً (أقل من 3 جمل) لتحسين المبيعات أو المخزون. ابدأ بإيموجي مناسب.`;
+قدم توصية استراتيجية واحدة فقط ذكية وموجزة جداً (أقل من 3 جمل) لتحسين المبيعات أو المخزون. ابدأ بإيموجي مناسب. ممنوع استخدام <think> أو كتابة تفكيرك الداخلي، أعطني التوصية النهائية مباشرة.`;
     
     const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: systemPrompt },
@@ -487,7 +497,7 @@ ${dbContext}
     const systemInstruction = `أنت مساعد ذكي لمحل تجاري اسمك "مساعد MARKET".
 بيانات المحل: ${dbContext}
 
-قواعد: أجب بدقة بناءً على البيانات. اذكر الأرقام المحددة. عند الأسئلة الاستشارية قدّم 3 نصائح مرقمة. أضف إيموجي. الإجابة بالعربية. لا تخترع بيانات غير موجودة.`;
+قواعد: أجب بدقة بناءً على البيانات. اذكر الأرقام المحددة. عند الأسئلة الاستشارية قدّم 3 نصائح مرقمة. أضف إيموجي. الإجابة بالعربية. لا تخترع بيانات غير موجودة. ممنوع طباعة تفكيرك الداخلي أو استخدام <think>. أجب مباشرة.`;
 
     // Build conversation history for API (last 4 messages max to save tokens)
     const recentMessages = [...messages, userMsg].slice(-4);
