@@ -34,6 +34,9 @@ const PREFERRED_MODELS = [
 const BLOCKED_MODELS = [
   'allam-2-7b',
   'allam-2-7b-instruct',
+  'qwen-2.5-32b',
+  'qwen-2.5-coder-32b',
+  'qwen/qwen3.6-27b',
   'whisper-large-v3',
   'whisper-large-v3-turbo',
   'distil-whisper-large-v3-en',
@@ -205,15 +208,14 @@ export default function AIEngine() {
         const availableIds: string[] = (data.data || [])
           .map((m: { id: string }) => m.id)
           .filter((id: string) => !BLOCKED_MODELS.includes(id));
-        // Return first preferred model that is available
+        // Return ONLY preferred models. Never fallback to random unknown models
+        // because they often have tiny rate limits (e.g. qwen, allam).
         const found = PREFERRED_MODELS.find(m => availableIds.includes(m));
         if (found) return found;
-        // Fallback: return first non-blocked model
-        if (availableIds.length > 0) return availableIds[0];
       }
     } catch { /* ignore, fall through */ }
-    // Last resort: return the last known working default
-    return 'llama-3.1-8b-instant';
+    // Last resort: return the most stable free tier model
+    return 'llama-3.3-70b-versatile';
   }, []);
 
   const fetchGroq = useCallback(async (apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]) => {

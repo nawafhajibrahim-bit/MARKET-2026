@@ -123,7 +123,10 @@ export const Settings = () => {
     if (
       saved === 'llama3-8b-8192' ||
       saved === 'llama-3.1-8b-instant' ||
-      saved === 'llama-3.3-8b-instant'
+      saved === 'llama-3.3-8b-instant' ||
+      saved.includes('allam') ||
+      saved.includes('qwen') ||
+      saved.includes('whisper')
     ) {
       saved = 'meta-llama/llama-4-scout-17b-16e-instruct';
       localStorage.setItem('ai_model', saved);
