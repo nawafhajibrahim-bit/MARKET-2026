@@ -167,8 +167,14 @@ export const initDB = async (): Promise<RxDatabase> => {
 
 const seedDemoData = async (db: any) => {
     try {
+        // Prevent auto-re-seeding if products were intentionally cleared or already seeded once
+        if (localStorage.getItem('smartmarket_demo_seeded') === 'true') {
+            return;
+        }
+
         const count = await db.products.find().exec().then((docs: any[]) => docs.length);
         if (count === 0) {
+            localStorage.setItem('smartmarket_demo_seeded', 'true');
             const demoProducts = [
                 {
                     id: "demo-prod-1",

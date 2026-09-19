@@ -22,6 +22,7 @@ export const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -339,14 +340,25 @@ export const Inventory = () => {
 
   const handleDeleteProduct = async (id: string) => {
     try {
-      const doc = await db.products.findOne(id).exec();
-      if (doc) await doc.remove();
+      let doc = await db.products.findOne(id).exec();
+      if (!doc) {
+        doc = await db.products.findOne({ selector: { id } }).exec();
+      }
+      if (!doc) {
+        doc = await db.products.findOne({ selector: { barcode: id } }).exec();
+      }
+      if (doc) {
+        await doc.remove();
+      }
       
       // Remove associated units
       const associatedUnits = await db.units.find({ selector: { product_id: id } }).exec();
       for (const u of associatedUnits) {
         await u.remove();
       }
+
+      // Mark demo as seeded so demo data is never auto-re-seeded
+      localStorage.setItem('smartmarket_demo_seeded', 'true');
 
       triggerNotification(
         i18n.language === 'ar' ? 'تم حذف المنتج بنجاح!' : 'Product deleted successfully!',
@@ -360,6 +372,32 @@ export const Inventory = () => {
       );
     } finally {
       setDeleteConfirmId(null);
+    }
+  };
+
+  const handleClearAllProducts = async () => {
+    try {
+      const allProducts = await db.products.find().exec();
+      for (const p of allProducts) {
+        await p.remove();
+      }
+      const allUnits = await db.units.find().exec();
+      for (const u of allUnits) {
+        await u.remove();
+      }
+      localStorage.setItem('smartmarket_demo_seeded', 'true');
+      triggerNotification(
+        isAr ? 'تم تصفير المخزن وحذف جميع المواد بنجاح!' : 'All products cleared successfully!',
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to clear all products:', err);
+      triggerNotification(
+        isAr ? 'فشل تصفير المواد!' : 'Failed to clear all products!',
+        'error'
+      );
+    } finally {
+      setShowClearAllModal(false);
     }
   };
 
@@ -452,6 +490,16 @@ export const Inventory = () => {
             <Download size={18} />
             <span className="hidden sm:inline">{t('export_csv')}</span>
           </button>
+          {products.length > 0 && (
+            <button 
+              onClick={() => setShowClearAllModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500 hover:text-white active:scale-95 transition-all font-medium cursor-pointer"
+              title={isAr ? "تصفير وحذف جميع المواد" : "Clear All Products"}
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">{isAr ? "تصفير المواد" : "Clear All"}</span>
+            </button>
+          )}
           <button 
             onClick={handleOpenAdd}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:brightness-110 active:scale-95 transition-all font-medium cursor-pointer"
@@ -906,6 +954,48 @@ export const Inventory = () => {
                 className="px-5 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 active:scale-95 transition-all cursor-pointer"
               >
                 {t('delete_confirm_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear All Products Confirmation Modal */}
+      {showClearAllModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#1f2028] rounded-2xl w-full max-w-md p-6 shadow-2xl border border-black/10 dark:border-white/10 text-[var(--text)]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-500/15 rounded-xl text-red-500">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-red-600 dark:text-red-400">
+                  {isAr ? 'تأكيد تصفير المخزن' : 'Confirm Clear Inventory'}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {isAr ? `سيتم حذف كافة المواد (${products.length} مادة)` : `All (${products.length}) products will be deleted`}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              {isAr 
+                ? 'تحذير: هل أنت متأكد من رغبتك في حذف جميع المواد المتبقية وتصفير المخزن بالكامل؟ لن تتمكن من التراجع عن هذه العملية.'
+                : 'Warning: Are you sure you want to delete all remaining products and clear inventory? This cannot be undone.'}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowClearAllModal(false)}
+                className="px-5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium cursor-pointer text-sm"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAllProducts}
+                className="px-5 py-2.5 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 active:scale-95 transition-all cursor-pointer text-sm shadow-md shadow-red-500/20"
+              >
+                {isAr ? 'نعم، احذف جميع المواد' : 'Yes, Delete All Products'}
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle, ShieldCheck } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
 import { useAuth } from '../contexts/AuthContext';
@@ -687,6 +687,44 @@ export const Settings = () => {
   }, [isAdmin]);
 
 
+
+  const [resetModalType, setResetModalType] = useState<'inventory' | 'sales' | 'full' | null>(null);
+  const [resetProcessing, setResetProcessing] = useState(false);
+
+  const handleExecuteReset = async () => {
+    if (!resetModalType) return;
+    setResetProcessing(true);
+    try {
+      if (resetModalType === 'inventory' || resetModalType === 'full') {
+        const prods = await db.products.find().exec();
+        for (const p of prods) await p.remove();
+        const units = await db.units.find().exec();
+        for (const u of units) await u.remove();
+        localStorage.setItem('smartmarket_demo_seeded', 'true');
+        localStorage.removeItem('pos_cart');
+      }
+
+      if (resetModalType === 'sales' || resetModalType === 'full') {
+        const invs = await db.invoices.find().exec();
+        for (const inv of invs) await inv.remove();
+        const debts = await db.debts.find().exec();
+        for (const d of debts) await d.remove();
+        if (db.purchases) {
+          const purch = await db.purchases.find().exec();
+          for (const pu of purch) await pu.remove();
+        }
+        localStorage.removeItem('pos_cart');
+      }
+
+      alert(isAr ? 'تمت عملية التصفير بنجاح!' : 'Reset completed successfully!');
+      setResetModalType(null);
+    } catch (err) {
+      console.error(err);
+      alert(isAr ? 'حدث خطأ أثناء التصفير!' : 'Reset operation failed!');
+    } finally {
+      setResetProcessing(false);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-8">
@@ -1742,6 +1780,124 @@ export const Settings = () => {
                 className="px-5 py-2 rounded-lg bg-[var(--color-primary)] text-white hover:brightness-110 active:scale-95 transition-all font-semibold cursor-pointer text-sm"
               >
                 {t('update_now')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Danger Zone: System Data Reset Card */}
+      {isAdmin && (
+        <div className="bg-white dark:bg-[#1f2028] p-6 rounded-xl shadow-sm border border-red-500/20">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-black/5 dark:border-white/5">
+            <div className="p-2.5 bg-red-500/10 text-red-500 rounded-xl">
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-red-600 dark:text-red-400">
+                {isAr ? 'تصفير بيانات البرنامج' : 'Reset System Data'}
+              </h3>
+              <p className="text-xs text-gray-500">
+                {isAr ? 'خيارات تصفير المخزن أو سجل المبيعات والبدء من جديد' : 'Options to clear inventory or sales history and start fresh'}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Clear Inventory only */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 bg-black/5 dark:bg-white/5 rounded-xl">
+              <div>
+                <h4 className="font-semibold text-sm">{isAr ? 'تصفير المخزن وحذف المواد' : 'Clear Inventory Products'}</h4>
+                <p className="text-xs text-gray-500">{isAr ? 'حذف كافة المواد والوحدات من المخزن للبدء بإدخال مواد جديدة' : 'Delete all products and units from inventory'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetModalType('inventory')}
+                className="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white border border-red-500/30 rounded-lg text-sm font-semibold transition-all cursor-pointer whitespace-nowrap"
+              >
+                {isAr ? 'تصفير المواد' : 'Clear Products'}
+              </button>
+            </div>
+
+            {/* Clear Sales & Debts only */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 bg-black/5 dark:bg-white/5 rounded-xl">
+              <div>
+                <h4 className="font-semibold text-sm">{isAr ? 'تصفير سجل المبيعات والديون' : 'Clear Sales & Debts'}</h4>
+                <p className="text-xs text-gray-500">{isAr ? 'مسح كافة الفواتير والديون والمشتريات السابقة مع الاحتفاظ بالمواد' : 'Delete all past invoices, debts and purchases while keeping products'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetModalType('sales')}
+                className="px-4 py-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white border border-amber-500/30 rounded-lg text-sm font-semibold transition-all cursor-pointer whitespace-nowrap"
+              >
+                {isAr ? 'تصفير المبيعات' : 'Clear Sales'}
+              </button>
+            </div>
+
+            {/* Full Program Reset */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 bg-red-500/5 rounded-xl border border-red-500/20">
+              <div>
+                <h4 className="font-semibold text-sm text-red-600 dark:text-red-400">{isAr ? 'تصفير البرنامج بالكامل' : 'Full System Reset'}</h4>
+                <p className="text-xs text-gray-500">{isAr ? 'مسح كافة المواد والمبيعات والديون والمشتريات لتشغيل البرنامج كمتجر جديد تماماً' : 'Clear all products, sales, debts and purchases for a completely fresh start'}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetModalType('full')}
+                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg text-sm font-bold shadow-md shadow-red-500/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              >
+                {isAr ? 'تصفير شامل للبرنامج' : 'Full Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {resetModalType && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#1f2028] text-[var(--text)] rounded-2xl w-full max-w-md p-6 shadow-2xl border border-black/10 dark:border-white/10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-500/15 rounded-xl text-red-500">
+                <AlertTriangle size={26} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-red-600 dark:text-red-400">
+                  {resetModalType === 'inventory' 
+                    ? (isAr ? 'تأكيد تصفير المخزن' : 'Confirm Clear Inventory')
+                    : resetModalType === 'sales'
+                    ? (isAr ? 'تأكيد تصفير المبيعات والديون' : 'Confirm Clear Sales & Debts')
+                    : (isAr ? 'تأكيد التصفير الشامل للبرنامج' : 'Confirm Full System Reset')}
+                </h3>
+                <p className="text-xs text-gray-400">
+                  {isAr ? 'هذا الإجراء نهائي ولا يمكن التراجع عنه' : 'This action is permanent and cannot be undone'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+              {resetModalType === 'inventory' 
+                ? (isAr ? 'هل أنت متأكد من رغبتك في حذف كافة المواد المسجلة في المخزن؟ سيتم تفريغ قائمة المواد بالكامل.' : 'Are you sure you want to delete all products in the inventory?')
+                : resetModalType === 'sales'
+                ? (isAr ? 'هل أنت متأكد من رغبتك في مسح كافة الفواتير والديون السابقة؟ سيتم تصفير سجلات المبيعات بالكامل.' : 'Are you sure you want to delete all past invoices and debts?')
+                : (isAr ? 'تحذير شديد: هل أنت متأكد من تصفير كافة بيانات البرنامج (المخزن، الفواتير، الديون، المشتريات)؟ سيعود البرنامج فارغاً تماماً للبدء من الصفر.' : 'Severe Warning: Are you sure you want to reset all data (products, invoices, debts)?')}
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={resetProcessing}
+                onClick={() => setResetModalType(null)}
+                className="px-5 py-2.5 rounded-xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium cursor-pointer text-sm"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={resetProcessing}
+                onClick={handleExecuteReset}
+                className="px-5 py-2.5 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 active:scale-95 transition-all cursor-pointer text-sm shadow-md shadow-red-500/20 disabled:opacity-50"
+              >
+                {resetProcessing ? '...' : (isAr ? 'تأكيد التصفير والحذف' : 'Confirm Reset')}
               </button>
             </div>
           </div>
