@@ -37,6 +37,7 @@ export const Inventory = () => {
   const [minSafetyStock, setMinSafetyStock] = useState(5);
   const [expiryDate, setExpiryDate] = useState('');
   const [unit, setUnit] = useState<string>('piece');
+  const [editStockMode, setEditStockMode] = useState<'replenish' | 'direct'>('replenish');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
@@ -66,6 +67,7 @@ export const Inventory = () => {
         setCategory(p.category || '');
         setCostPrice(p.cost_price);
         setSalePrice(p.sale_price);
+        setEditStockMode('replenish');
         setStockQuantity(0);
         setMinSafetyStock(p.min_safety_stock ?? 5);
         setExpiryDate(p.expiry_date || '');
@@ -93,6 +95,7 @@ export const Inventory = () => {
     setCategory(product.category || '');
     setCostPrice(product.cost_price);
     setSalePrice(product.sale_price);
+    setEditStockMode('replenish');
     setStockQuantity(0);
     setMinSafetyStock(product.min_safety_stock ?? 5);
     setExpiryDate(product.expiry_date || '');
@@ -119,6 +122,7 @@ export const Inventory = () => {
     setCategory('');
     setCostPrice(0);
     setSalePrice(0);
+    setEditStockMode('replenish');
     setStockQuantity(0);
     setMinSafetyStock(5);
     setExpiryDate('');
@@ -227,7 +231,18 @@ export const Inventory = () => {
         const pDoc = await db.products.findOne(editProductId).exec();
         if (pDoc) {
           const currentStock = pDoc.toJSON().stock_quantity;
-          const addedQty = Number(stockQuantity);
+          const finalStock = editStockMode === 'replenish' 
+            ? currentStock + Number(stockQuantity) 
+            : Number(stockQuantity);
+
+          if (finalStock < 0) {
+            triggerNotification(
+              isAr ? 'لا يمكن أن يكون المخزون النهائي سالباً!' : 'Final stock cannot be negative!',
+              'error'
+            );
+            return;
+          }
+
           await pDoc.incrementalPatch({
             barcode: barcode || editProductId,
             sku_serial: skuSerial || undefined,
@@ -236,7 +251,7 @@ export const Inventory = () => {
             category: category || 'General',
             cost_price: Number(costPrice),
             sale_price: Number(salePrice),
-            stock_quantity: currentStock + addedQty,
+            stock_quantity: finalStock,
             min_safety_stock: Number(minSafetyStock),
             expiry_date: expiryDate || undefined,
             unit: unit
@@ -648,51 +663,121 @@ export const Inventory = () => {
                   <label className="block text-sm font-medium mb-1">{t('cost_price_label')}</label>
                   <input 
                     type="number" 
-                    step="0.01"
+                    step="any"
+                    min="0"
                     required
                     value={costPrice || ''}
                     onChange={(e) => setCostPrice(Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                    placeholder="0.25"
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono"
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">{t('sale_price_label')}</label>
                   <input 
                     type="number" 
-                    step="0.01"
+                    step="any"
+                    min="0"
                     required
                     value={salePrice || ''}
                     onChange={(e) => setSalePrice(Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                    placeholder="0.50"
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono"
+                    placeholder="0.00"
                   />
                 </div>
+
+                {/* Live Profit Preview */}
+                {(costPrice > 0 || salePrice > 0) && (
+                  <div className="md:col-span-2 py-2 px-3.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 flex flex-wrap items-center justify-between text-xs gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-500">{t('profit_per_unit')}:</span>
+                      <span className={`font-bold font-mono text-sm ${
+                        (salePrice - costPrice) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'
+                      }`} dir="ltr">
+                        {formatCurrency(salePrice - costPrice)}
+                      </span>
+                    </div>
+                    {salePrice > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-500">{t('profit_margin')}:</span>
+                        <span className={`font-bold font-mono ${
+                          (salePrice - costPrice) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'
+                        }`} dir="ltr">
+                          {(((salePrice - costPrice) / salePrice) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+                    {costPrice > 0 && salePrice > 0 && salePrice < costPrice && (
+                      <span className="text-red-500 font-semibold text-[11px]">
+                        ⚠️ {isAr ? 'تنبيه: سعر البيع أقل من سعر الشراء بالجملة!' : 'Warning: Sale price is less than wholesale cost!'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="md:col-span-2 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mt-1 flex items-start gap-2">
                   <div className="text-blue-500 mt-0.5">
                     <Info size={16} />
                   </div>
                   <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                    <strong className="font-bold">تنبيه هام لضبط الأرباح:</strong> تأكد أن (سعر التكلفة) و (سعر البيع) يمثلان تسعيرة <strong>للوحدة الأساسية المختارة</strong> (مثلاً: تكلفة الكيلو الواحد وليس الشوال كاملاً). وعند البيع يمكنك كتابة الكمية بالكسور (مثال: 1.5 كيلو) وسيحسب النظام الأرباح بدقة.
+                    <strong className="font-bold">{isAr ? 'تنبيه لضبط الأرباح:' : 'Pricing Tip:'}</strong> {isAr ? 'تأكد أن سعر الشراء وسعر البيع يمثلان تسعيرة الوحدة الأساسية المختارة، وعند البيع يحسب النظام الأرباح بدقة متناهية.' : 'Make sure purchase and sale prices represent the base unit chosen.'}
                   </p>
                 </div>
-                 <div>
-                   <label className="block text-sm font-medium mb-1">
-                     {editProductId 
-                       ? `${t('quantity_to_add')} (${t('current_stock')}: ${products.find(p => p.id === editProductId)?.stock_quantity || 0})`
-                       : t('stock')
-                     }
-                   </label>
-                   <input 
-                     type="number" 
-                     step="any"
-                     required
-                     value={stockQuantity !== undefined ? stockQuantity : ''}
-                     onChange={(e) => setStockQuantity(Number(e.target.value))}
-                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                     placeholder={editProductId ? "0" : "100"}
-                   />
-                 </div>
+
+                <div className="md:col-span-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <label className="block text-sm font-medium">
+                      {editProductId 
+                        ? (editStockMode === 'replenish' 
+                            ? `${t('quantity_to_add')} (${t('current_stock')}: ${products.find(p => p.id === editProductId)?.stock_quantity || 0})`
+                            : `${t('stock')} (${t('current_stock')}: ${products.find(p => p.id === editProductId)?.stock_quantity || 0})`)
+                        : t('stock')
+                      }
+                    </label>
+                    {editProductId && (
+                      <div className="flex gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-lg text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditStockMode('replenish');
+                            setStockQuantity(0);
+                          }}
+                          className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                            editStockMode === 'replenish'
+                              ? 'bg-[var(--color-primary)] text-white shadow-xs'
+                              : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                          }`}
+                        >
+                          {t('stock_mode_replenish')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curr = products.find(p => p.id === editProductId)?.stock_quantity || 0;
+                            setEditStockMode('direct');
+                            setStockQuantity(curr);
+                          }}
+                          className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                            editStockMode === 'direct'
+                              ? 'bg-[var(--color-primary)] text-white shadow-xs'
+                              : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                          }`}
+                        >
+                          {t('stock_mode_direct')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="number" 
+                    step="any"
+                    required
+                    value={stockQuantity !== undefined ? stockQuantity : ''}
+                    onChange={(e) => setStockQuantity(Number(e.target.value))}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono"
+                    placeholder={editProductId ? (editStockMode === 'replenish' ? "0" : "100") : "100"}
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">{t('safety_stock_label')}</label>
                   <input 

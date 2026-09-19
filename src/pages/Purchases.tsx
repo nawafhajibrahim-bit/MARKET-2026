@@ -231,7 +231,7 @@ export const Purchases = () => {
                     value={supplierName}
                     onChange={e => setSupplierName(e.target.value)}
                     className="w-full px-4 py-2 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                    placeholder={isAr ? 'شركة المراعي, مستودع الجملة...' : 'Supplier Name...'}
+                    placeholder={isAr ? 'شركة المراعي, المورد...' : 'Supplier Name...'}
                   />
                 </div>
                 <div>

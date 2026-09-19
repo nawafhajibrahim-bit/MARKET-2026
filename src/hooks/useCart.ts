@@ -138,6 +138,14 @@ export function useCart(
     }, 0);
   };
 
+  const calculateCartCostTotal = () => {
+    return cart.reduce((sum, item) => {
+      const factor = item.selectedUnit ? item.selectedUnit.conversion_factor : 1;
+      const baseCost = Number(item.product.cost_price) || 0;
+      return sum + (baseCost * factor * item.quantity);
+    }, 0);
+  };
+
   const clearCart = () => {
     setCart([]);
   };
@@ -151,6 +159,7 @@ export function useCart(
     handleSetQuantity,
     handleUnitChangeInCart,
     calculateCartTotal,
+    calculateCartCostTotal,
     clearCart
   };
 }

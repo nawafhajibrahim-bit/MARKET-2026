@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle, Camera, Keyboard, X } from 'lucide-react';
+import { ShoppingCart, Search, DollarSign, HandCoins, Trash2, Plus, Minus, Calculator, Printer, AlertTriangle, Camera, Keyboard, X, Eye, EyeOff, TrendingUp } from 'lucide-react';
 import { useDb } from '../database/Provider';
 import type { ProductDocType, UnitDocType } from '../database/schema';
 import { formatCurrency, getOfficialCurrency, getPOSExchangeRate, getCurrenciesList, getPOSHelperCurrency, setPOSHelperCurrency, getIsHelperCurrencyEnabled } from '../utils/currency';
@@ -67,6 +67,7 @@ export const POS = () => {
     handleSetQuantity,
     handleUnitChangeInCart,
     calculateCartTotal,
+    calculateCartCostTotal,
     clearCart
   } = useCart(unitsMap, triggerNotification, t);
 
@@ -545,6 +546,29 @@ export const POS = () => {
   }, [products, debouncedSearchTerm]);
 
   const cartTotal = calculateCartTotal();
+  const cartCostTotal = calculateCartCostTotal();
+  const cartProfit = cartTotal - cartCostTotal;
+  const profitMarginPercent = cartTotal > 0 ? ((cartProfit / cartTotal) * 100).toFixed(1) : '0';
+
+  const [showWholesaleInfo, setShowWholesaleInfo] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pos_show_wholesale') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleWholesaleInfo = () => {
+    setShowWholesaleInfo(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('pos_show_wholesale', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
   const isAr = i18n.language === 'ar';
 
   return (
@@ -867,11 +891,49 @@ export const POS = () => {
 
         {/* Footer actions */}
         <div className="p-4 bg-black/5 dark:bg-white/5 border-t border-black/5 dark:border-white/5">
-          <div className="flex justify-between items-center mb-4 text-xl">
-            <span className="font-bold">{t('total')}</span>
-             <span className="font-bold text-[var(--color-primary)]" dir="ltr">
+          {/* Dual Total Summary: Customer Selling Price & Wholesale Purchase Cost */}
+          <div className="space-y-2 mb-4 bg-white/70 dark:bg-black/25 p-3.5 rounded-2xl border border-black/5 dark:border-white/5 shadow-xs">
+            {/* Customer Selling Total */}
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-sm text-gray-700 dark:text-gray-200">
+                {t('customer_total')}
+              </span>
+              <span className="font-black text-xl text-green-600 dark:text-green-400 font-mono" dir="ltr">
                 {formatCurrency(cartTotal)}
-             </span>
+              </span>
+            </div>
+
+            {/* Wholesale Owner Row */}
+            <div className="pt-2 border-t border-dashed border-black/10 dark:border-white/10 text-xs">
+              <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-purple-700 dark:text-purple-300">{t('wholesale_cost_total')}:</span>
+                  <button
+                    type="button"
+                    onClick={toggleWholesaleInfo}
+                    title={showWholesaleInfo ? t('hide_wholesale_info') : t('show_wholesale_info')}
+                    className="p-1 text-gray-400 hover:text-[var(--color-primary)] rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    {showWholesaleInfo ? <Eye size={13} /> : <EyeOff size={13} />}
+                  </button>
+                </div>
+                <span className="font-bold font-mono text-purple-700 dark:text-purple-300" dir="ltr">
+                  {showWholesaleInfo ? formatCurrency(cartCostTotal) : '••••••'}
+                </span>
+              </div>
+
+              {showWholesaleInfo && (
+                <div className="flex justify-between items-center mt-1 text-[11px] text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <TrendingUp size={12} className="text-emerald-500" />
+                    <span>{t('expected_profit')}:</span>
+                  </span>
+                  <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400" dir="ltr">
+                    {formatCurrency(cartProfit)} ({profitMarginPercent}%)
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -1142,21 +1204,57 @@ export const POS = () => {
                         - {formatCurrency(calculateDiscountAmount())}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center mb-2 text-sm text-gray-500 border-t border-black/5 dark:border-white/5 pt-2">
-                      <span>{t('total')}</span>
-                      <span className="font-bold font-mono text-[var(--color-primary)]" dir="ltr">
+                    <div className="flex justify-between items-center mb-2 text-base text-gray-700 dark:text-gray-200 border-t border-black/5 dark:border-white/5 pt-2">
+                      <span className="font-bold">{t('customer_total')}</span>
+                      <span className="font-black font-mono text-green-600 dark:text-green-400 text-lg" dir="ltr">
                         {formatCurrency(calculateFinalTotal())}
                       </span>
                     </div>
                   </>
                 ) : (
-                  <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
-                    <span>{t('total')}</span>
-                    <span className="font-bold font-mono" dir="ltr">
+                  <div className="flex justify-between items-center mb-2 text-base text-gray-700 dark:text-gray-200">
+                    <span className="font-bold">{t('customer_total')}</span>
+                    <span className="font-black font-mono text-green-600 dark:text-green-400 text-lg" dir="ltr">
                       {formatCurrency(cartTotal)}
                     </span>
                   </div>
                 )}
+                
+                {/* Owner Wholesale Summary inside Checkout Modal */}
+                <div className="mt-3 pt-3 border-t border-dashed border-black/10 dark:border-white/10 text-xs bg-black/5 dark:bg-white/5 -mx-2 -mb-2 p-2.5 rounded-lg">
+                  <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-purple-700 dark:text-purple-300">{t('wholesale_cost_total')}:</span>
+                      <button
+                        type="button"
+                        onClick={toggleWholesaleInfo}
+                        title={showWholesaleInfo ? t('hide_wholesale_info') : t('show_wholesale_info')}
+                        className="p-1 text-gray-400 hover:text-[var(--color-primary)] rounded cursor-pointer"
+                      >
+                        {showWholesaleInfo ? <Eye size={13} /> : <EyeOff size={13} />}
+                      </button>
+                    </div>
+                    <span className="font-bold font-mono text-purple-700 dark:text-purple-300" dir="ltr">
+                      {showWholesaleInfo ? formatCurrency(cartCostTotal) : '••••••'}
+                    </span>
+                  </div>
+
+                  {showWholesaleInfo && (() => {
+                    const finalProfit = calculateFinalTotal() - cartCostTotal;
+                    const finalMargin = calculateFinalTotal() > 0 ? ((finalProfit / calculateFinalTotal()) * 100).toFixed(1) : '0';
+                    return (
+                      <div className="flex justify-between items-center mt-1 text-[11px] text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <TrendingUp size={12} className="text-emerald-500" />
+                          <span>{t('expected_profit')}:</span>
+                        </span>
+                        <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400" dir="ltr">
+                          {formatCurrency(finalProfit)} ({finalMargin}%)
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
                 
                 {/* Dynamic Currency Converter Helper */}
                 {isHelperCurrencyEnabled && (

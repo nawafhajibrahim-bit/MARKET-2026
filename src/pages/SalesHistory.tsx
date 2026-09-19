@@ -33,6 +33,7 @@ export const SalesHistory = () => {
 
   const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
   const [products, setProducts] = useState<ProductDocType[]>([]);
+  const [unitsMap, setUnitsMap] = useState<Record<string, import('../database/schema').UnitDocType[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -78,9 +79,22 @@ export const SalesHistory = () => {
       setProducts(docs.map((d) => d.toJSON()));
     });
 
+    const unitsSub = db.units.find().$.subscribe((docs) => {
+      const mapping: Record<string, import('../database/schema').UnitDocType[]> = {};
+      docs.forEach(doc => {
+        const u = doc.toJSON();
+        if (!mapping[u.product_id]) {
+          mapping[u.product_id] = [];
+        }
+        mapping[u.product_id].push(u);
+      });
+      setUnitsMap(mapping);
+    });
+
     return () => {
       invoiceSub.unsubscribe();
       productsSub.unsubscribe();
+      unitsSub.unsubscribe();
     };
   }, [db]);
 
@@ -542,19 +556,50 @@ export const SalesHistory = () => {
             </div>
 
             {/* Totals */}
-            <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5">
+            <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5 space-y-2">
               {selectedInvoice.discount_amount && selectedInvoice.discount_amount > 0 && (
-                <div className="flex justify-between items-center text-sm mb-2 text-red-500">
+                <div className="flex justify-between items-center text-sm text-red-500">
                   <span>{t('discount_amount')}:</span>
                   <span className="font-bold font-mono" dir="ltr">- {formatCurrency(selectedInvoice.discount_amount)}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center text-lg font-bold">
-                <span>{t('total')}</span>
-                <span className={`font-mono ${selectedInvoice.total_amount < 0 ? 'text-red-500' : 'text-green-500'}`} dir="ltr">
+              <div className="flex justify-between items-center text-base font-bold">
+                <span>{t('customer_total')}</span>
+                <span className={`font-mono text-lg ${selectedInvoice.total_amount < 0 ? 'text-red-500' : 'text-green-500'}`} dir="ltr">
                   {formatCurrency(selectedInvoice.total_amount)}
                 </span>
               </div>
+
+              {/* Wholesale Cost and Profit breakdown for owner */}
+              {(() => {
+                let invoiceWholesaleCost = 0;
+                selectedInvoice.items?.forEach(item => {
+                  const prod = products.find(p => p.id === item.product_id);
+                  const prodUnits = unitsMap[item.product_id] || [];
+                  const foundUnit = prodUnits.find(u => u.unit_name === item.unit_used);
+                  const factor = foundUnit ? foundUnit.conversion_factor : 1;
+                  const cost = prod ? (Number(prod.cost_price) || 0) : 0;
+                  invoiceWholesaleCost += cost * factor * item.quantity;
+                });
+                const invoiceProfit = selectedInvoice.total_amount - invoiceWholesaleCost;
+
+                return (
+                  <div className="pt-2 border-t border-dashed border-black/10 dark:border-white/10 text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-purple-700 dark:text-purple-300">{t('wholesale_cost_total')}:</span>
+                      <span className="font-bold font-mono text-purple-700 dark:text-purple-300" dir="ltr">
+                        {formatCurrency(invoiceWholesaleCost)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px] text-gray-500">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{t('expected_profit')}:</span>
+                      <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400" dir="ltr">
+                        {formatCurrency(invoiceProfit)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
