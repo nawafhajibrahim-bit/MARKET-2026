@@ -209,7 +209,7 @@ export const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {stats.licenseDaysRemaining !== null && stats.licenseDaysRemaining <= 14 && (
+      {stats.licenseDaysRemaining !== null && !stats.isTrial && stats.licenseDaysRemaining <= 7 && (
         <div className={`p-4 rounded-xl flex items-start gap-3 border shadow-sm ${stats.licenseDaysRemaining <= 3 ? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-300' : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'}`}>
           <AlertTriangle className="flex-shrink-0 mt-0.5" />
           <div className="flex-1">

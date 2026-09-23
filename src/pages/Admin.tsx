@@ -530,22 +530,17 @@ export const Admin = () => {
 
   // Render Login state
   if (!isAuthenticatedOwner) {
-    const handleOwnerLogin = (e?: React.FormEvent, customUser?: string, customPass?: string) => {
-      if (e) e.preventDefault();
-      const u = (customUser ?? ownerUsername).trim().toLowerCase();
-      const p = (customPass ?? ownerPassword).trim();
+    const handleOwnerLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      const u = ownerUsername.trim().toLowerCase();
+      const p = ownerPassword.trim();
       
-      // Allow admin/admin, developer/dev123, or common admin credentials
-      if (
-        (u === 'admin' && (p === 'admin' || p === 'dev123' || p === 'admin123')) ||
-        (u === 'developer' && (p === 'dev123' || p === 'admin' || p === 'admin123')) ||
-        (u === 'admin' && p === '') // quick fallback
-      ) {
+      // Strict credentials for owner: admin / admin1984
+      if ((u === 'admin' || u === 'developer') && p === 'admin1984') {
         setIsAuthenticatedOwner(true);
         localStorage.setItem('sm_owner_auth', 'true');
         
-        // Auto-configure secret if empty to smoothly enter dashboard
-        const secret = adminSecret || 'admin123';
+        const secret = 'admin1984';
         setAdminSecret(secret);
         localStorage.setItem('sm_developer_secret', secret);
         fetchLicensesList(secret);
@@ -553,7 +548,7 @@ export const Admin = () => {
         fetchFeedbacks();
         fetchDevConfig();
       } else {
-        alert(isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة. يمكنك استخدام admin وكلمة المرور admin' : 'Invalid username or password. You can use admin / admin');
+        alert(isAr ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password');
       }
     };
 
@@ -568,11 +563,11 @@ export const Admin = () => {
               {isAr ? 'تسجيل دخول المالك' : 'Owner Login'}
             </h2>
             <p className="text-sm opacity-60">
-              {isAr ? 'تمت إعادة التعيين: يمكنك الدخول باستخدام admin وكلمة المرور admin' : 'Reset active: You can login with admin / admin'}
+              {isAr ? 'الرجاء إدخال بيانات الدخول الخاصة بالمالك.' : 'Please enter owner credentials.'}
             </p>
           </div>
           
-          <form onSubmit={(e) => handleOwnerLogin(e)} className="space-y-4">
+          <form onSubmit={handleOwnerLogin} className="space-y-4">
             <div className="relative">
               <input 
                 type="text"
@@ -580,7 +575,7 @@ export const Admin = () => {
                 value={ownerUsername}
                 onChange={(e) => setOwnerUsername(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-center font-bold tracking-wider"
-                placeholder={isAr ? 'اسم المستخدم (admin)' : 'Username (admin)'}
+                placeholder={isAr ? 'اسم المستخدم' : 'Username'}
               />
               <Users className="absolute left-3.5 top-3.5 opacity-40" size={18} />
             </div>
@@ -591,7 +586,7 @@ export const Admin = () => {
                 value={ownerPassword}
                 onChange={(e) => setOwnerPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-center font-bold tracking-wider"
-                placeholder={isAr ? 'كلمة المرور (admin)' : 'Password (admin)'}
+                placeholder={isAr ? 'كلمة المرور' : 'Password'}
               />
               <KeyRound className="absolute left-3.5 top-3.5 opacity-40" size={18} />
             </div>
@@ -600,14 +595,6 @@ export const Admin = () => {
               className="w-full py-3 bg-[var(--color-primary)] hover:brightness-110 text-white rounded-xl active:scale-95 transition-all font-bold cursor-pointer shadow-md shadow-purple-500/20"
             >
               {isAr ? 'تسجيل الدخول' : 'Login'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOwnerLogin(undefined, 'admin', 'admin')}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl active:scale-95 transition-all text-sm font-bold cursor-pointer flex items-center justify-center gap-2"
-            >
-              ⚡ {isAr ? 'دخول مباشر بنقرة واحدة (admin)' : 'Quick 1-Click Login (admin)'}
             </button>
           </form>
           <div className="pt-4 border-t border-black/5 dark:border-white/5 mt-4">
@@ -632,25 +619,30 @@ export const Admin = () => {
               {isAr ? 'بوابة التحكم الآمنة' : 'Secure Admin Portal'}
             </h2>
             <p className="text-sm opacity-60">
-              {isAr ? 'الرمز السري الافتراضي هو admin123 أو يمكنك الدخول المباشر' : 'Default secret is admin123 or click bypass'}
+              {isAr ? 'الرجاء إدخال رمز المطور السري لإدارة المشتركين.' : 'Enter developer secret to manage subscribers.'}
             </p>
           </div>
           
           <form onSubmit={(e) => { 
             e.preventDefault(); 
-            const secret = tempSecretInput.trim() || 'admin123';
-            setAdminSecret(secret);
-            localStorage.setItem('sm_developer_secret', secret);
-            fetchLicensesList(secret);
-            fetchRequestsList(secret);
+            const secret = tempSecretInput.trim();
+            if (secret === 'admin1984' || secret === (import.meta.env.VITE_DEV_MASTER_SECRET || 'admin1984')) {
+              setAdminSecret(secret);
+              localStorage.setItem('sm_developer_secret', secret);
+              fetchLicensesList(secret);
+              fetchRequestsList(secret);
+            } else {
+              alert(isAr ? 'الرمز السري غير صحيح' : 'Invalid secret');
+            }
           }} className="space-y-4">
             <div className="relative">
               <input 
                 type="password"
+                required
                 value={tempSecretInput}
                 onChange={(e) => setTempSecretInput(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] focus:bg-transparent outline-none transition-all text-center font-mono font-bold tracking-wider"
-                placeholder={isAr ? 'الرمز السري (الافتراضي admin123)' : 'Secret (Default admin123)'}
+                placeholder={isAr ? 'أدخل الرمز السري' : 'Enter Secret'}
               />
               <KeyRound className="absolute left-3.5 top-3.5 opacity-40" size={18} />
             </div>
@@ -659,19 +651,6 @@ export const Admin = () => {
               className="w-full py-3 bg-[var(--color-primary)] hover:brightness-110 text-white rounded-xl active:scale-95 transition-all font-bold cursor-pointer shadow-md shadow-purple-500/20"
             >
               {isAr ? '🔑 دخول سحابي آمن' : '🔑 Secure Cloud Login'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const secret = 'admin123';
-                setAdminSecret(secret);
-                localStorage.setItem('sm_developer_secret', secret);
-                fetchLicensesList(secret);
-                fetchRequestsList(secret);
-              }}
-              className="w-full py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-xs font-bold rounded-xl transition-all cursor-pointer"
-            >
-              {isAr ? 'تخطي والدخول المباشر بالافتراضي ➡️' : 'Bypass with default secret ➡️'}
             </button>
           </form>
           <div className="pt-4 border-t border-black/5 dark:border-white/5 mt-4">

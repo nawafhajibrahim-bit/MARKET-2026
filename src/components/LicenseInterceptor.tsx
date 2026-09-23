@@ -33,19 +33,16 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [warningMessage]);
 
   const applyExpirationWarnings = (daysLeft: number, isTrial: boolean, isOffline: boolean = false) => {
+    // Open promotional trial has NO warnings
+    if (isTrial) {
+      setWarningMessage(null);
+      return;
+    }
     if (daysLeft <= 7) {
-      if (isTrial) {
-        if (daysLeft <= 3) {
-          setWarningMessage(`تنبيه: متبقي لديك ${daysLeft} أيام في الفترة التجريبية المجانية ${isOffline ? '(أوفلاين)' : ''}. يرجى أخذ نسخة احتياطية من بياناتك. للتفعيل الكامل: ${OWNER_PHONE}`);
-        } else {
-          setWarningMessage(`تنبيه: أنت في الفترة التجريبية المجانية ${isOffline ? '(أوفلاين)' : ''}، متبقي لديك ${daysLeft} أيام. للتفعيل اتصل بنا: ${OWNER_PHONE}`);
-        }
+      if (daysLeft <= 3) {
+        setWarningMessage(`تنبيه هام جداً: اشتراكك سينتهي خلال ${daysLeft} أيام! ${isOffline ? '(أوفلاين)' : ''} يرجى طلب تمديد الاشتراك فوراً لتجنب توقف النظام. للتمديد: ${OWNER_PHONE}`);
       } else {
-        if (daysLeft <= 3) {
-          setWarningMessage(`تنبيه هام جداً: اشتراكك سينتهي خلال ${daysLeft} أيام! ${isOffline ? '(أوفلاين)' : ''} يرجى طلب تمديد الاشتراك فوراً لتجنب توقف النظام. للتمديد: ${OWNER_PHONE}`);
-        } else {
-          setWarningMessage(`تنبيه: اقترب موعد انتهاء اشتراكك. متبقي ${daysLeft} أيام. يرجى طلب تمديد الاشتراك لضمان استمرار عمل النظام. للتواصل: ${OWNER_PHONE}`);
-        }
+        setWarningMessage(`تنبيه: اقترب موعد انتهاء اشتراكك. متبقي ${daysLeft} أيام. يرجى طلب تمديد الاشتراك لضمان استمرار عمل النظام. للتواصل: ${OWNER_PHONE}`);
       }
     } else {
       setWarningMessage(null);

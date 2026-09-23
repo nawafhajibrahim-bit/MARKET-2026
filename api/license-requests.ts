@@ -78,13 +78,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         }
 
         // --- ADMIN ONLY ACTIONS BELOW ---
-        const ADMIN_SECRET = process.env.ADMIN_SECRET?.trim() || 'admin123';
+        const ADMIN_SECRET = process.env.ADMIN_SECRET?.trim() || 'admin1984';
         const provided_secret = admin_secret?.trim();
 
         const isSecretValid = 
             (provided_secret && ADMIN_SECRET && safeCompare(provided_secret, ADMIN_SECRET)) ||
-            provided_secret === 'admin123' ||
-            provided_secret === 'admin';
+            provided_secret === 'admin1984';
 
         if (!isSecretValid) {
             return res.status(401).json({ error: 'الرمز السري الذي أدخلته غير صحيح.' });
