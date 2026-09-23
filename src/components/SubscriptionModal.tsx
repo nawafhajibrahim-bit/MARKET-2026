@@ -112,7 +112,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose })
               await configDoc.incrementalPatch({ 
                 license_key: activationKey, 
                 activation_status: true, 
-                offline_grace_days_left: 14,
+                offline_grace_days_left: 365,
                 last_sync_timestamp: new Date().toISOString(),
                 hardware_fingerprint: hwFingerprint,
                 activation_token: encryptedToken,
@@ -146,7 +146,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ onClose })
               await configDoc.incrementalPatch({ 
                 license_key: activationKey, 
                 activation_status: true, 
-                offline_grace_days_left: 14,
+                offline_grace_days_left: 365,
                 last_sync_timestamp: new Date().toISOString(),
                 hardware_fingerprint: hwFingerprint,
                 activation_token: encryptedToken,

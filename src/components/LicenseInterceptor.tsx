@@ -33,16 +33,16 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [warningMessage]);
 
   const applyExpirationWarnings = (daysLeft: number, isTrial: boolean, isOffline: boolean = false) => {
-    if (daysLeft <= 15) {
+    if (daysLeft <= 7) {
       if (isTrial) {
         if (daysLeft <= 3) {
-          setWarningMessage(`تنبيه هام: متبقي لديك ${daysLeft} أيام فقط في الفترة التجريبية ${isOffline ? '(أوفلاين)' : ''}. يرجى أخذ نسخة احتياطية من بياناتك لتجنب فقدانها عند انتهاء التجربة وقفل البرنامج. للتفعيل الكامل اتصل بنا: ${OWNER_PHONE}`);
+          setWarningMessage(`تنبيه: متبقي لديك ${daysLeft} أيام في الفترة التجريبية المجانية ${isOffline ? '(أوفلاين)' : ''}. يرجى أخذ نسخة احتياطية من بياناتك. للتفعيل الكامل: ${OWNER_PHONE}`);
         } else {
-          setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية ${isOffline ? '(أوفلاين)' : ''}، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+          setWarningMessage(`تنبيه: أنت في الفترة التجريبية المجانية ${isOffline ? '(أوفلاين)' : ''}، متبقي لديك ${daysLeft} أيام. للتفعيل اتصل بنا: ${OWNER_PHONE}`);
         }
       } else {
         if (daysLeft <= 3) {
-          setWarningMessage(`تنبيه هام جداً: اشتراكك سينتهي خلال ${daysLeft} أيام! ${isOffline ? '(أوفلاين)' : ''} يرجى طلب تمديد الاشتراك فوراً لتجنب توقف النظام. للتمديد اتصل بنا: ${OWNER_PHONE}`);
+          setWarningMessage(`تنبيه هام جداً: اشتراكك سينتهي خلال ${daysLeft} أيام! ${isOffline ? '(أوفلاين)' : ''} يرجى طلب تمديد الاشتراك فوراً لتجنب توقف النظام. للتمديد: ${OWNER_PHONE}`);
         } else {
           setWarningMessage(`تنبيه: اقترب موعد انتهاء اشتراكك. متبقي ${daysLeft} أيام. يرجى طلب تمديد الاشتراك لضمان استمرار عمل النظام. للتواصل: ${OWNER_PHONE}`);
         }
@@ -109,8 +109,37 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           return;
         }
 
-        // If not activated, show lock screen
+        // If not activated, auto-start the promotional 1-year trial seamlessly
         if (!activation_status || !license_key) {
+           try {
+             const res = await fetch('/api/start-trial', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ hw_fingerprint: hwFingerprint })
+             });
+             const data = await res.json().catch(() => ({}));
+             if (res.ok && data.active) {
+               const tokenPayload = JSON.stringify({ 
+                 license_key: 'TRIAL', 
+                 hw_fingerprint: hwFingerprint, 
+                 expiry_date: data.expiry_date 
+               });
+               const activationToken = await encryptData(tokenPayload, hwFingerprint);
+               await configDoc.incrementalPatch({
+                 license_key: 'TRIAL',
+                 activation_status: true,
+                 offline_grace_days_left: 365,
+                 last_sync_timestamp: new Date().toISOString(),
+                 hardware_fingerprint: hwFingerprint,
+                 activation_token: activationToken,
+                 clock_tamper_detected: false
+               });
+               if (isMounted) setIsAuthorized(true);
+               return;
+             }
+           } catch (autoErr) {
+             console.warn('Auto trial start failed, showing manual option:', autoErr);
+           }
            if (isMounted) setIsAuthorized(false);
            return;
         }
@@ -157,9 +186,39 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
         if (isTrial && expiryDateStr) {
           const trialExpiry = new Date(expiryDateStr);
           if (now > trialExpiry) {
+            // Auto-renew via /api/start-trial for the 1-year open promotional period if connected
+            if (navigator.onLine) {
+              try {
+                const res = await fetch('/api/start-trial', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ hw_fingerprint: hwFingerprint })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.active) {
+                  const tokenPayload = JSON.stringify({ 
+                    license_key: 'TRIAL', 
+                    hw_fingerprint: hwFingerprint, 
+                    expiry_date: data.expiry_date 
+                  });
+                  const activationToken = await encryptData(tokenPayload, hwFingerprint);
+                  await configDoc.incrementalPatch({
+                    activation_status: true,
+                    offline_grace_days_left: 365,
+                    last_sync_timestamp: new Date().toISOString(),
+                    activation_token: activationToken,
+                    clock_tamper_detected: false
+                  });
+                  if (isMounted) setIsAuthorized(true);
+                  return;
+                }
+              } catch {
+                // fallback
+              }
+            }
             await configDoc.incrementalPatch({ activation_status: false });
             if (isMounted) {
-              setErrorMsg('انتهت الفترة التجريبية المجانية (14 يوماً). يرجى تفعيل البرنامج.');
+              setErrorMsg('انتهت الفترة التجريبية المجانية. يرجى تفعيل البرنامج.');
               setIsAuthorized(false);
             }
             return;
@@ -202,7 +261,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     const newActivationToken = await encryptData(tokenPayload, hwFingerprint);
 
                     await configDoc.incrementalPatch({ 
-                      offline_grace_days_left: 14,
+                      offline_grace_days_left: 365,
                       last_sync_timestamp: newSyncTime,
                       activation_token: newActivationToken,
                       clock_tamper_detected: false
@@ -218,7 +277,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                     const errorType = data.error || 'license_verify_failed';
                     await configDoc.incrementalPatch({ activation_status: false });
                     if (isMounted) {
-                        setErrorMsg(errorType === 'trial_expired' ? 'انتهت الفترة التجريبية المجانية (14 يوماً). يرجى تفعيل البرنامج.' : (t(errorType) || errorType));
+                        setErrorMsg(errorType === 'trial_expired' ? 'انتهت الفترة التجريبية المجانية. يرجى تفعيل البرنامج.' : (t(errorType) || errorType));
                         setIsAuthorized(false);
                     }
                     return;
@@ -240,11 +299,11 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         }
 
-        const remainingGrace = Math.max(0, 14 - daysPassed);
+        const remainingGrace = Math.max(0, 365 - daysPassed);
         if (remainingGrace > 0) {
             await configDoc.incrementalPatch({ offline_grace_days_left: remainingGrace });
             if (isMounted) {
-                setWarningMessage(t('offline_warning', { days: remainingGrace }) || `أنت تعمل بدون اتصال بالإنترنت. يرجى الاتصال خلال ${remainingGrace} أيام للتحقق من الترخيص.`);
+                setWarningMessage(t('offline_warning', { days: remainingGrace }) || `أنت تعمل بدون اتصال بالإنترنت. يرجى الاتصال خلال ${remainingGrace} يوماً للتحقق من الترخيص.`);
                 setIsAuthorized(true);
             }
         } else {
@@ -293,7 +352,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
           id: 'config',
           license_key: 'TRIAL',
           activation_status: true,
-          offline_grace_days_left: 14,
+          offline_grace_days_left: 365,
           last_sync_timestamp: new Date().toISOString(),
           hardware_fingerprint: hwFingerprint,
           activation_token: activationToken,
@@ -304,7 +363,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
             await existing.incrementalPatch({
               license_key: 'TRIAL',
               activation_status: true,
-              offline_grace_days_left: 14,
+              offline_grace_days_left: 365,
               last_sync_timestamp: new Date().toISOString(),
               hardware_fingerprint: hwFingerprint,
               activation_token: activationToken,
@@ -314,11 +373,11 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
         });
 
         const daysLeft = Math.max(0, Math.ceil((new Date(data.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
-        setWarningMessage(`تحذير: أنت في الفترة التجريبية المجانية، متبقي لديك ${daysLeft} أيام. للطلب وتفعيل النسخة الكاملة اتصل بنا: ${OWNER_PHONE}`);
+        applyExpirationWarnings(daysLeft, true, false);
         setIsAuthorized(true);
       } else {
         const errorType = data.error || 'trial_failed';
-        setErrorMsg(errorType === 'trial_expired' ? 'عذراً، هذا الجهاز استخدم الفترة التجريبية مسبقاً ولا يمكن تفعيلها مجدداً.' : 'فشل بدء الفترة التجريبية.');
+        setErrorMsg(errorType === 'trial_expired' ? 'عذراً، هذا الجهاز استخدم الفترة التجريبية مسبقاً.' : 'فشل بدء الفترة التجريبية.');
       }
     } catch (err) {
       console.error(err);
@@ -348,7 +407,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                   id: 'config',
                   license_key: licenseKey,
                   activation_status: true,
-                  offline_grace_days_left: 14,
+                  offline_grace_days_left: 365,
                   last_sync_timestamp: new Date().toISOString(),
                   hardware_fingerprint: hwFingerprint,
                   activation_token: activationToken,
@@ -359,7 +418,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                       await existing.incrementalPatch({ 
                         license_key: licenseKey, 
                         activation_status: true, 
-                        offline_grace_days_left: 14,
+                        offline_grace_days_left: 365,
                         last_sync_timestamp: new Date().toISOString(),
                         hardware_fingerprint: hwFingerprint,
                         activation_token: activationToken,
@@ -391,7 +450,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                   id: 'config',
                   license_key: licenseKey,
                   activation_status: true,
-                  offline_grace_days_left: 14,
+                  offline_grace_days_left: 365,
                   last_sync_timestamp: new Date().toISOString(),
                   hardware_fingerprint: hwFingerprint,
                   activation_token: encryptedToken,
@@ -402,7 +461,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                       await existing.incrementalPatch({ 
                         license_key: licenseKey, 
                         activation_status: true, 
-                        offline_grace_days_left: 14,
+                        offline_grace_days_left: 365,
                         last_sync_timestamp: new Date().toISOString(),
                         hardware_fingerprint: hwFingerprint,
                         activation_token: encryptedToken,
@@ -433,7 +492,7 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                  </div>
                  <h1 className="text-2xl font-bold text-red-500">{t('license_required') || 'تفعيل البرنامج مطلوب'}</h1>
                  <p className="text-sm opacity-80 leading-relaxed">
-                     {t('license_missing_desc') || 'رخصة برنامجك مفقودة أو منتهية الصلاحية. يرجى إدخال مفتاح ترخيص صالح أدناه أو بدء الفترة التجريبية.'}
+                     {t('license_missing_desc') || 'يمكنك بدء التجربة المجانية المفتوحة أو إدخال مفتاح الترخيص.'}
                  </p>
                  <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 p-2.5 rounded-lg border border-orange-500/20 leading-relaxed">
                      {isAr 
@@ -458,6 +517,20 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                  </div>
 
                  <div className="space-y-4">
+                   <button
+                     onClick={handleStartTrial}
+                     disabled={loading}
+                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 text-base"
+                   >
+                     ⚡ {isAr ? 'بدء الفترة التجريبية المجانية المفتوحة (سنة كاملة مجاناً)' : 'Start Open Free Trial (1 Full Year Free)'}
+                   </button>
+
+                   <div className="relative flex py-2 items-center">
+                       <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+                       <span className="flex-shrink mx-4 text-gray-400 text-xs font-semibold uppercase">أو لديك كود ترخيص؟</span>
+                       <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+                   </div>
+
                    <div className="space-y-3">
                      <input 
                         type="text" 
@@ -477,20 +550,6 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                          {loading ? t('verifying') : (t('activate_license') || 'تفعيل الترخيص')}
                      </button>
                    </div>
-
-                   <div className="relative flex py-2 items-center">
-                       <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
-                       <span className="flex-shrink mx-4 text-gray-400 text-xs font-semibold uppercase">أو جرب البرنامج مجاناً</span>
-                       <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
-                   </div>
-
-                   <button
-                     onClick={handleStartTrial}
-                     disabled={loading}
-                     className="w-full py-3 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text)] font-semibold rounded-lg active:scale-95 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
-                   >
-                     ⚡ بدء فترة تجريبية مجانية (14 يوماً)
-                   </button>
                  </div>
               </div>
           </div>
