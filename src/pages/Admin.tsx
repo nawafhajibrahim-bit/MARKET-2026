@@ -18,7 +18,8 @@ import {
   MessageSquare,
   Settings,
   Star,
-  MessageCircle
+  MessageCircle,
+  Zap
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -57,6 +58,7 @@ export const Admin = () => {
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [globalTrialEnabled, setGlobalTrialEnabled] = useState<boolean>(true);
 
   // Modals States
   const [showAddModal, setShowAddModal] = useState(false);
@@ -218,6 +220,9 @@ export const Admin = () => {
       const data = await res.json();
       if (res.ok && data.success) {
         setLicensesList(data.licenses || {});
+        if (typeof data.trial_enabled === 'boolean') {
+          setGlobalTrialEnabled(data.trial_enabled);
+        }
         localStorage.setItem('sm_developer_secret', adminSecret);
       } else {
         alert(data.error || 'Failed to fetch licenses');
@@ -227,6 +232,30 @@ export const Admin = () => {
       alert('Network error fetching licenses');
     } finally {
       setListLoading(false);
+    }
+  }
+
+  async function toggleGlobalTrial(enable: boolean) {
+    if (!adminSecret) return;
+    try {
+      const res = await fetch('/api/manage-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_secret: adminSecret,
+          action: 'toggle-trial',
+          enabled: enable
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGlobalTrialEnabled(data.trial_enabled);
+      } else {
+        alert(data.error || 'Failed to update trial status');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error updating trial status');
     }
   }
 
@@ -806,6 +835,38 @@ export const Admin = () => {
                 <h4 className="text-2xl font-extrabold mt-0.5">{activatedDevices}</h4>
               </div>
             </div>
+          </div>
+
+          {/* Global Trial Status Banner & Control */}
+          <div className="bg-white dark:bg-[#1f2028] p-4.5 rounded-2xl shadow-sm border border-black/10 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-xl ${globalTrialEnabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}`}>
+                <Zap size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm">
+                  {isAr ? 'حالة الفترة المجانية التلقائية (سنة كاملة مجاناً للجميع)' : 'Automatic 1-Year Free Trial Status'}
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {globalTrialEnabled 
+                    ? (isAr ? '✅ الفترة المجانية مفعلة حالياً - يحصل أي مستخدم جديد على سنة كاملة مجاناً تلقائياً.' : '✅ Trial active - new users get 1 full year free.')
+                    : (isAr ? '⛔ الفترة المجانية متوقفة حالياً - يُلزم المستخدمون الجدد بالتفعيل اليدوي عبر مفتاح ترخيص.' : '⛔ Trial disabled - users must activate with license key.')}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => toggleGlobalTrial(!globalTrialEnabled)}
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 ${
+                globalTrialEnabled 
+                  ? 'bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white border border-red-500/20' 
+                  : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-600/20'
+              }`}
+            >
+              {globalTrialEnabled 
+                ? (isAr ? '🔴 إيقاف الفترة المجانية (إغلاق)' : '🔴 Disable Global Trial')
+                : (isAr ? '🟢 تشغيل الفترة المجانية (سنة)' : '🟢 Enable 1-Year Trial')}
+            </button>
           </div>
 
           {/* Control Bar - Search & Filter */}

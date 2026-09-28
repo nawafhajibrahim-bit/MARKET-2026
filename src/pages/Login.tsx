@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LogIn, User, Lock, Store, Zap, MessageCircle, ChevronDown, ChevronUp, ShieldCheck, ArrowRight } from 'lucide-react';
+import { LogIn, User, Lock, Store, Zap, MessageCircle, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDb } from '../database/Provider';
 import { hashPassword, generateSalt } from '../services/passwordService';
@@ -10,14 +10,12 @@ export const LoginScreen: React.FC = () => {
   const isAr = i18n.language.startsWith('ar');
   const { login, availableBranches, switchBranch } = useAuth();
   
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const db = useDb();
-  const [isLicensed, setIsLicensed] = useState<boolean>(false);
 
   // First run setup state
   const [isFirstRun, setIsFirstRun] = useState<boolean>(false);
@@ -28,17 +26,6 @@ export const LoginScreen: React.FC = () => {
     if (!db) return;
     const checkStatus = async () => {
       try {
-        // Check license
-        const configDoc = await db.system_config.findOne('config').exec();
-        if (configDoc) {
-          const config = configDoc.toJSON();
-          const licensed = config.activation_status === true && !!config.license_key;
-          setIsLicensed(licensed);
-          if (licensed) {
-            setShowAdvanced(true);
-          }
-        }
-
         // Check if first run (only admin user exists and has no password salt = never logged in)
         const users = await db.users.find().exec();
         if (users.length === 1 && users[0].username === 'admin' && !users[0].password_salt) {
@@ -222,6 +209,24 @@ export const LoginScreen: React.FC = () => {
               {loading ? t('verifying') : (isAr ? 'حفظ والبدء الآن' : 'Save and Start Now')}
               <ArrowRight size={20} className={isAr ? 'rotate-180' : ''} />
             </button>
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+              <span className="flex-shrink mx-4 text-gray-400 text-xs font-semibold">
+                {isAr ? 'أو للبدء السريع المباشر' : 'Or for instant start'}
+              </span>
+              <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleQuickLogin}
+              disabled={loading}
+              className="w-full py-3 bg-[var(--color-primary)] hover:brightness-110 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-md active:scale-95 cursor-pointer"
+            >
+              <Zap size={18} />
+              <span>{isAr ? 'تخطي والبدء مباشرة بحساب التجربة (admin / admin)' : 'Skip & Start Free Trial (admin / admin)'}</span>
+            </button>
           </form>
         </div>
       </div>
@@ -245,103 +250,99 @@ export const LoginScreen: React.FC = () => {
           </div>
         )}
 
-        {!isLicensed && (
-          <>
-            <div className="space-y-4 pt-2">
-              <button
-                onClick={handleQuickLogin}
-                disabled={loading}
-                className="w-full py-4 bg-[var(--color-primary)] text-white font-bold rounded-xl hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-lg shadow-lg shadow-[var(--color-primary)]/20 cursor-pointer"
-              >
-                <Zap size={24} />
-                {loading ? t('verifying') : (isAr ? 'الدخول السريع للتجربة' : 'Quick Trial Login')}
-              </button>
+        {/* 1-Click Quick Trial Login */}
+        <div className="space-y-3">
+          <button
+            onClick={handleQuickLogin}
+            disabled={loading}
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-lg shadow-lg shadow-emerald-600/25 cursor-pointer"
+          >
+            <Zap size={24} />
+            {loading ? t('verifying') : (isAr ? '⚡ الدخول السريع للتجربة (admin)' : '⚡ Quick Trial Login (admin)')}
+          </button>
+          <p className="text-[11px] text-center text-gray-500 font-medium">
+            {isAr ? '💡 اسم المستخدم: admin | كلمة المرور: admin' : '💡 Username: admin | Password: admin'}
+          </p>
+        </div>
 
-              <button
-                onClick={handleRequestSubscription}
-                className="w-full py-3.5 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 cursor-pointer"
-              >
-                <MessageCircle size={22} />
-                {isAr ? 'طلب تفعيل أو اشتراك' : 'Request Subscription'}
-              </button>
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+          <span className="flex-shrink mx-4 text-gray-400 text-xs font-semibold">
+            {isAr ? 'أو تسجيل الدخول' : 'Or Sign In'}
+          </span>
+          <div className="flex-grow border-t border-black/10 dark:border-white/10"></div>
+        </div>
+
+        <form onSubmit={handleAdvancedSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold mb-1.5">{t('username') || 'Username'}</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-medium"
+                placeholder="admin"
+              />
             </div>
+          </div>
 
-            <div className="pt-6 border-t border-black/5 dark:border-white/5">
-              <button 
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-[var(--text)] transition-colors font-semibold cursor-pointer"
-              >
-                {isAr ? 'دخول متقدم / موظف' : 'Advanced / Employee Login'}
-                {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
+          <div>
+            <label className="block text-sm font-bold mb-1.5">{t('password') || 'Password'}</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-medium tracking-widest"
+                placeholder="admin"
+              />
             </div>
-          </>
-        )}
+          </div>
 
-        {showAdvanced && (
-          <form onSubmit={handleAdvancedSubmit} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          {availableBranches.length > 0 && (
             <div>
-              <label className="block text-sm font-bold mb-1.5">{t('username') || 'Username'}</label>
+              <label className="block text-sm font-bold mb-1.5">{t('branch') || 'Branch'}</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-medium"
-                  placeholder="admin"
-                  autoFocus
-                />
+                <Store className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <select
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all cursor-pointer font-medium appearance-none"
+                >
+                  <option value="">{t('select_branch') || 'Select Branch'}</option>
+                  {availableBranches.map(b => (
+                    <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-bold mb-1.5">{t('password') || 'Password'}</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-medium tracking-widest"
-                  placeholder="••••••"
-                />
-              </div>
-            </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 mt-2 bg-[var(--color-primary)] text-white hover:brightness-110 font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-[var(--color-primary)]/20 active:scale-95"
+          >
+            {loading ? t('verifying') : (t('login') || 'Login')}
+          </button>
 
-            {availableBranches.length > 0 && (
-              <div>
-                <label className="block text-sm font-bold mb-1.5">{t('branch') || 'Branch'}</label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all cursor-pointer font-medium appearance-none"
-                  >
-                    <option value="">{t('select_branch') || 'Select Branch'}</option>
-                    {availableBranches.map(b => (
-                      <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 mt-2 bg-[var(--color-primary)] text-white hover:brightness-110 font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-[var(--color-primary)]/20 active:scale-95"
-            >
-              {loading ? t('verifying') : (t('login') || 'Login')}
-            </button>
-          </form>
-        )}
+          <button
+            type="button"
+            onClick={handleRequestSubscription}
+            className="w-full py-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold rounded-xl hover:bg-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 border border-emerald-500/20 text-sm cursor-pointer"
+          >
+            <MessageCircle size={18} />
+            {isAr ? 'طلب تفعيل أو اشتراك رسمي' : 'Request Official Subscription'}
+          </button>
+        </form>
       </div>
 
       <div className="absolute bottom-6 left-0 right-0 text-center z-10">
-        <a href="/owner-portal" className="text-xs text-gray-400 hover:text-[var(--color-primary)] transition-colors opacity-60 hover:opacity-100 cursor-pointer">
-          {isAr ? 'دخول المطور' : 'Developer Login'}
+        <a href="/owner-portal" className="text-xs text-gray-400 hover:text-[var(--color-primary)] transition-colors opacity-70 hover:opacity-100 cursor-pointer font-medium">
+          {isAr ? '🔐 بوابة الإدارة والمالك (Owner Portal)' : '🔐 Owner / Developer Portal'}
         </a>
       </div>
     </div>

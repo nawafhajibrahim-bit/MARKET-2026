@@ -6,7 +6,7 @@ type ApiRequest = {
     method?: string;
     body: {
         admin_secret?: string;
-        action?: 'save' | 'list' | 'clear-devices' | 'delete';
+        action?: 'save' | 'list' | 'clear-devices' | 'delete' | 'toggle-trial';
         license_key?: string;
         expiry_date?: string;
         status?: string;
@@ -14,6 +14,7 @@ type ApiRequest = {
         phone?: string;
         max_devices?: number;
         timestamp?: string;
+        enabled?: boolean;
     };
 };
 
@@ -93,7 +94,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                     }
                 });
             }
-            return res.status(200).json({ success: true, licenses });
+
+            let trial_enabled = true;
+            try {
+                const setting = await kv.get('config:trial_enabled');
+                if (setting === false) trial_enabled = false;
+            } catch {
+                // ignore
+            }
+
+            return res.status(200).json({ success: true, licenses, trial_enabled });
+        }
+
+        // Toggle global trial action
+        if (action === 'toggle-trial') {
+            const { enabled = true } = req.body;
+            await kv.set('config:trial_enabled', !!enabled);
+            return res.status(200).json({ success: true, trial_enabled: !!enabled });
         }
 
         // 2. Clear devices action

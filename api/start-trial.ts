@@ -27,6 +27,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const TRIAL_DURATION_DAYS = 365; // Open free trial for 1 full year until owner stops it
 
     try {
+        // Check if owner disabled trials globally
+        try {
+            const globalTrialEnabled = await kv.get('config:trial_enabled');
+            if (globalTrialEnabled === false) {
+                return res.status(403).json({ 
+                    active: false, 
+                    error: 'trial_disabled_globally',
+                    message: 'تم إيقاف الفترة التجريبية المجانية حالياً من قبل الإدارة.'
+                });
+            }
+        } catch (kvErr) {
+            console.warn('KV read warning in start-trial config:', kvErr);
+        }
+
         const trialKey = `trial:${hw_fingerprint}`;
         let existingTrial: any = null;
         try {

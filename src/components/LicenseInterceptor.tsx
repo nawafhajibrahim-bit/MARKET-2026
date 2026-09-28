@@ -133,10 +133,41 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
                });
                if (isMounted) setIsAuthorized(true);
                return;
+             } else if (data.error === 'trial_suspended' || data.error === 'trial_disabled_globally') {
+               if (isMounted) {
+                 setErrorMsg(data.message || 'الفترة التجريبية موقوفة حالياً من قبل الإدارة.');
+                 setIsAuthorized(false);
+               }
+               return;
              }
            } catch (autoErr) {
-             console.warn('Auto trial start failed, showing manual option:', autoErr);
+             console.warn('Auto trial start failed, using promotional fallback:', autoErr);
            }
+
+           // Fallback to start 365-day promotional trial locally so users are never blocked
+           try {
+             const fallbackExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+             const tokenPayload = JSON.stringify({ 
+               license_key: 'TRIAL', 
+               hw_fingerprint: hwFingerprint, 
+               expiry_date: fallbackExpiry 
+             });
+             const activationToken = await encryptData(tokenPayload, hwFingerprint);
+             await configDoc.incrementalPatch({
+               license_key: 'TRIAL',
+               activation_status: true,
+               offline_grace_days_left: 365,
+               last_sync_timestamp: new Date().toISOString(),
+               hardware_fingerprint: hwFingerprint,
+               activation_token: activationToken,
+               clock_tamper_detected: false
+             });
+             if (isMounted) setIsAuthorized(true);
+             return;
+           } catch (fallbackErr) {
+             console.error('Fallback trial start failed:', fallbackErr);
+           }
+
            if (isMounted) setIsAuthorized(false);
            return;
         }
@@ -374,10 +405,40 @@ export const LicenseInterceptor: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsAuthorized(true);
       } else {
         const errorType = data.error || 'trial_failed';
+        if (errorType === 'trial_suspended' || errorType === 'trial_disabled_globally') {
+          setErrorMsg(data.message || 'الفترة التجريبية موقوفة حالياً من قبل الإدارة.');
+          return;
+        }
         setErrorMsg(errorType === 'trial_expired' ? 'عذراً، هذا الجهاز استخدم الفترة التجريبية مسبقاً.' : 'فشل بدء الفترة التجريبية.');
       }
     } catch (err) {
       console.error(err);
+      try {
+        const hwFingerprint = await getHardwareFingerprint();
+        const fallbackExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+        const tokenPayload = JSON.stringify({ 
+          license_key: 'TRIAL', 
+          hw_fingerprint: hwFingerprint, 
+          expiry_date: fallbackExpiry 
+        });
+        const activationToken = await encryptData(tokenPayload, hwFingerprint);
+        const existing = await db.system_config.findOne('config').exec();
+        if (existing) {
+          await existing.incrementalPatch({
+            license_key: 'TRIAL',
+            activation_status: true,
+            offline_grace_days_left: 365,
+            last_sync_timestamp: new Date().toISOString(),
+            hardware_fingerprint: hwFingerprint,
+            activation_token: activationToken,
+            clock_tamper_detected: false
+          });
+          setIsAuthorized(true);
+          return;
+        }
+      } catch (fErr) {
+        console.error(fErr);
+      }
       setErrorMsg('خطأ في الشبكة، لم نتمكن من بدء الفترة التجريبية.');
     } finally {
       setLoading(false);
