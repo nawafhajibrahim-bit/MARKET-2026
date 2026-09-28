@@ -278,6 +278,7 @@ export const LoginScreen: React.FC = () => {
           </>
         )}
 
+        {showAdvanced && (
           <form onSubmit={handleAdvancedSubmit} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div>
               <label className="block text-sm font-bold mb-1.5">{t('username') || 'Username'}</label>
@@ -303,12 +304,9 @@ export const LoginScreen: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all font-medium tracking-widest"
-                  placeholder="admin"
+                  placeholder="••••••"
                 />
               </div>
-              <p className="text-[11px] text-gray-500 mt-1.5 text-center">
-                {isAr ? 'البيانات الافتراضية للتجربة: admin / admin' : 'Default trial credentials: admin / admin'}
-              </p>
             </div>
 
             {availableBranches.length > 0 && (
@@ -333,31 +331,12 @@ export const LoginScreen: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-[var(--color-primary)] text-white hover:brightness-110 font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-[var(--color-primary)]/20 active:scale-95"
+              className="w-full py-4 mt-2 bg-[var(--color-primary)] text-white hover:brightness-110 font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-[var(--color-primary)]/20 active:scale-95"
             >
               {loading ? t('verifying') : (t('login') || 'Login')}
             </button>
-
-            <button
-              type="button"
-              onClick={handleQuickLogin}
-              disabled={loading}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
-            >
-              <Zap size={18} />
-              <span>{isAr ? 'دخول تجريبي مباشر بنقرة واحدة (admin)' : 'Quick 1-Click Trial Login'}</span>
-            </button>
           </form>
-
-          <div className="pt-4 border-t border-black/5 dark:border-white/5">
-            <a
-              href="/store"
-              className="w-full py-2.5 px-4 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-xs border border-purple-500/20"
-            >
-              <Store size={15} />
-              <span>{isAr ? '🛍️ فتح متجر الزبائن العام مباشرة (بدون تسجيل دخول)' : '🛍️ Open Customer Storefront Directly'}</span>
-            </a>
-          </div>
+        )}
       </div>
 
       <div className="absolute bottom-6 left-0 right-0 text-center z-10">

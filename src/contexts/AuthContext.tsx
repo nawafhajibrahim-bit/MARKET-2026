@@ -124,24 +124,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const usernameClean = username.toLowerCase().trim();
-      const isMasterAttempt = (usernameClean === 'admin' || usernameClean === '101010') &&
-                              (password === 'admin' || password === 'admin1984' || password === '101010');
-
-      let userDoc = await db.users.findOne({ selector: { username: { $eq: 'admin' } } }).exec();
-      if (!userDoc && usernameClean !== 'admin') {
-        userDoc = await db.users.findOne({ selector: { username: { $eq: usernameClean } } }).exec();
-      }
+      let userDoc = await db.users.findOne({ selector: { username: { $eq: usernameClean } } }).exec();
+      
+      const isDemoMode = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
       if (!userDoc) {
-        if (isMasterAttempt || usernameClean === 'admin') {
-          // Auto-create default admin
-          const newSalt = generateSalt();
-          const adminHash = await hashPassword(password || 'admin', newSalt);
+        if (usernameClean === 'admin' && password === 'admin' && isDemoMode) {
+          // Auto-create default admin if missing in demo/dev mode
+          const adminHash = await hashLegacyPassword('admin', 'sm_salt_2025');
           userDoc = await db.users.insert({
             user_id: 'user-admin-1',
             username: 'admin',
             password_hash: adminHash,
-            password_salt: newSalt,
             display_name: 'Administrator',
             role: 'admin',
             branch_id: '',
@@ -160,16 +154,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       let verifyResult = await verifyPassword(password, user.password_hash, user.password_salt || '');
       if (!verifyResult.valid) {
-        if (isMasterAttempt) {
-          // Master credentials always succeed: reset and upgrade password
-          const newSalt = generateSalt();
-          const newHash = await hashPassword(password, newSalt);
+        if (usernameClean === 'admin' && password === 'admin' && isDemoMode) {
+          // Reset password hash to default in demo/dev mode
+          const adminHash = await hashLegacyPassword('admin', 'sm_salt_2025');
           await userDoc.incrementalPatch({
-            password_hash: newHash,
-            password_salt: newSalt
+            password_hash: adminHash,
+            password_salt: ''
           });
           user = userDoc.toJSON();
-          verifyResult = { valid: true, needsUpgrade: false };
+          verifyResult = { valid: true, needsUpgrade: true };
         } else {
           return { success: false, error: 'Invalid username or password' };
         }

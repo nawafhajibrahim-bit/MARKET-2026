@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, AlertTriangle, Package, FileText, QrCode, Store, ClipboardList, Truck, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, HandCoins, AlertTriangle, ShoppingCart, Package, FileText } from 'lucide-react';
 import { useDb } from '../database/Provider';
-import type { InvoiceDocType, DebtDocType, ProductDocType, OrderDocType } from '../database/schema';
+import type { InvoiceDocType, DebtDocType, ProductDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
 import { ZReportModal } from '../components/ZReportModal';
 import { SubscriptionModal } from '../components/SubscriptionModal';
-import { StoreQRCodeModal } from '../components/StoreQRCodeModal';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
 
 const AIEngine = React.lazy(() => import('../modules/ai/AIEngine'));
 
@@ -20,20 +18,17 @@ export const Dashboard = () => {
   const { isAdmin } = useAuth();
   
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [showZReport, setShowZReport] = useState(false);
   const [data, setData] = useState<{
     invoices: InvoiceDocType[];
     debts: DebtDocType[];
     products: ProductDocType[];
-    orders: OrderDocType[];
     sysConfig: any;
   }>({
     invoices: [],
     debts: [],
     products: [],
-    orders: [],
     sysConfig: null,
   });
   const [loading, setLoading] = useState(true);
@@ -54,11 +49,10 @@ export const Dashboard = () => {
 
     const loadStats = async () => {
       try {
-        const [invoiceDocs, debtDocs, productDocs, orderDocs, configDoc] = await Promise.all([
+        const [invoiceDocs, debtDocs, productDocs, configDoc] = await Promise.all([
           db.invoices.find().exec(),
           db.debts.find().exec(),
           db.products.find().exec(),
-          db.orders.find().exec(),
           db.system_config.findOne('config').exec(),
         ]);
 
@@ -67,7 +61,6 @@ export const Dashboard = () => {
             invoices: invoiceDocs.map(d => d.toJSON()),
             debts: debtDocs.map(d => d.toJSON()),
             products: productDocs.map(d => d.toJSON()),
-            orders: orderDocs.map(d => d.toJSON()),
             sysConfig: configDoc ? configDoc.toJSON() : null,
           });
           setLoading(false);
@@ -84,14 +77,12 @@ export const Dashboard = () => {
     const invoicesSub = db.invoices.find().$.subscribe(() => loadStats());
     const debtsSub = db.debts.find().$.subscribe(() => loadStats());
     const productsSub = db.products.find().$.subscribe(() => loadStats());
-    const ordersSub = db.orders.find().$.subscribe(() => loadStats());
 
     return () => {
       isMounted = false;
       invoicesSub.unsubscribe();
       debtsSub.unsubscribe();
       productsSub.unsubscribe();
-      ordersSub.unsubscribe();
     };
   }, [db]);
 
@@ -189,56 +180,6 @@ export const Dashboard = () => {
         return { name, count };
       });
 
-    // Orders Calculations (Customer Orders system)
-    const orders = data.orders || [];
-    const newOrders = orders.filter(o => o.status === 'new');
-    const totalOrdersRevenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-    const totalOrdersCost = orders.reduce((sum, o) => sum + (o.actual_cost ?? o.estimated_cost ?? 0), 0);
-    const totalOrdersProfit = totalOrdersRevenue - totalOrdersCost;
-
-    // Combined financial metrics (Invoices + Orders)
-    const combinedRevenue = (invoices.reduce((sum, inv) => sum + inv.total_amount, 0)) + totalOrdersRevenue;
-    const combinedCost = totalOrdersCost;
-    const combinedProfit = totalProfit + totalOrdersProfit;
-
-    // Product frequency calculation from orders + invoices
-    const productFrequency: Record<string, { count: number; name: string; unit: string; revenue: number }> = {};
-    products.forEach(p => {
-      productFrequency[p.id] = {
-        count: 0,
-        name: isAr ? p.name_ar : (p.name_en || p.name_ar),
-        unit: p.unit || 'كرتونة',
-        revenue: 0
-      };
-    });
-
-    // Count from orders
-    orders.forEach(o => {
-      (o.items || []).forEach(item => {
-        if (item.product_id && productFrequency[item.product_id]) {
-          productFrequency[item.product_id].count += item.quantity;
-          productFrequency[item.product_id].revenue += item.subtotal;
-        }
-      });
-    });
-
-    // Count from invoices
-    invoices.forEach(inv => {
-      (inv.items || []).forEach(item => {
-        if (item.product_id && productFrequency[item.product_id]) {
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          productFrequency[item.product_id].count += qty;
-          productFrequency[item.product_id].revenue += (price * qty);
-        }
-      });
-    });
-
-    const frequencyList = Object.values(productFrequency);
-    const topMovingProducts = [...frequencyList].sort((a, b) => b.count - a.count).filter(p => p.count > 0).slice(0, 5);
-    const leastMovingProducts = [...frequencyList].filter(p => p.count > 0).sort((a, b) => a.count - b.count).slice(0, 5);
-    const stagnantProducts = frequencyList.filter(p => p.count === 0).slice(0, 5);
-
     let licenseDaysRemaining = null;
     let isTrial = false;
     if (data.sysConfig && data.sysConfig.license_expiry) {
@@ -261,20 +202,8 @@ export const Dashboard = () => {
       expiredProducts,
       licenseDaysRemaining,
       isTrial,
-      // New On-Demand & Orders KPIs
-      ordersCount: orders.length,
-      newOrdersCount: newOrders.length,
-      totalOrdersRevenue,
-      totalOrdersCost,
-      totalOrdersProfit,
-      combinedRevenue,
-      combinedCost,
-      combinedProfit,
-      topMovingProducts,
-      leastMovingProducts,
-      stagnantProducts
     };
-  }, [data, t, i18n, isAr]);
+  }, [data, t, i18n]);
 
   const fmt = (n: number) => formatCurrency(n);
 
@@ -305,147 +234,75 @@ export const Dashboard = () => {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <span>لوحة التحكم والإحصائيات</span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            متابعة المبيعات، الطلبات، تكلفة الشراء من الموردين، والأرباح الحقيقية
-          </p>
-        </div>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">{t('dashboard')}</h2>
           
-        <div className="flex flex-wrap items-center gap-2">
-          {/* QR Button */}
-          <button
-            onClick={() => setShowQrModal(true)}
-            className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs text-xs cursor-pointer"
-          >
-            <QrCode size={16} />
-            <span>رمز QR المتجر</span>
-          </button>
-
-          {/* Customer Store Link */}
-          <a
-            href="/store"
-            target="_blank"
-            rel="noreferrer"
-            className="px-3.5 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-xs text-xs cursor-pointer"
-          >
-            <Store size={16} />
-            <span>متجر الزبائن ↗</span>
-          </a>
-
-          {/* Orders Page Link */}
-          <Link
-            to="/orders"
-            className="relative px-3.5 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-all flex items-center gap-1.5 border border-purple-500/20 text-xs"
-          >
-            <ClipboardList size={16} />
-            <span>إدارة الطلبات</span>
-            {stats.newOrdersCount > 0 && (
-              <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center">
-                {stats.newOrdersCount}
-              </span>
-            )}
-          </Link>
-
-          {/* Suppliers Page Link */}
-          <Link
-            to="/suppliers"
-            className="px-3.5 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all flex items-center gap-1.5 border border-black/5 dark:border-white/5 text-xs"
-          >
-            <Truck size={16} />
-            <span>الموردين</span>
-          </Link>
-
+        <div className="flex flex-wrap items-center gap-3">
           {isAdmin && (
             <button
               onClick={() => setShowSubscriptionModal(true)}
-              className="px-3 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 text-slate-500 dark:text-slate-400 font-medium rounded-xl transition-all flex items-center gap-1 text-xs"
+              className="px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-all flex items-center gap-2 border border-purple-500/20 shadow-sm"
             >
-              <FileText size={15} />
-              <span>الاشتراك</span>
+              <FileText size={18} />
+              {isAr ? 'تفعيل / ترقية الاشتراك' : 'Activate / Upgrade'}
             </button>
           )}
-
+          <button
+            onClick={() => setShowZReport(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all font-semibold text-sm cursor-pointer"
+          >
+            <FileText size={16} />
+            {t('z_report')}
+          </button>
           {loading && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
-              <div className="w-2.5 h-2.5 rounded-full bg-purple-600 animate-pulse" />
-              <span>{t('loading')}</span>
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <div className="w-3 h-3 rounded-full bg-[var(--color-primary)] animate-pulse" />
+              {t('loading')}
             </div>
           )}
         </div>
       </div>
 
-      {/* Summary KPI Cards: Sales, Wholesale Cost, Real Profit, Orders */}
+      {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Sales */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500">إجمالي المبيعات</span>
-            <div className="p-2 bg-blue-500/10 text-blue-600 rounded-xl">
-              <TrendingUp size={18} />
+        <div className="p-5 rounded-xl bg-white dark:bg-[#1f2028] shadow-sm border border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-500">{t('today_revenue')}</span>
+            <div className="p-2 bg-[var(--color-primary)]/10 rounded-lg">
+              <ShoppingCart size={16} className="text-[var(--color-primary)]" />
             </div>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white" dir="ltr">
-            {fmt(stats.combinedRevenue)}
-          </p>
-          <span className="text-[11px] text-slate-400 mt-1 block">
-            طلبات المتجر: {fmt(stats.totalOrdersRevenue)}
-          </span>
+          <p className="text-2xl font-bold" dir="ltr">{fmt(stats.todayRevenue)}</p>
         </div>
 
-        {/* Wholesale Purchase Cost */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
-              تكلفة الشراء من المورد (سري 🔒)
-            </span>
-            <div className="p-2 bg-purple-500/10 text-purple-600 rounded-xl">
-              <Truck size={18} />
+        <div className="p-5 rounded-xl bg-white dark:bg-[#1f2028] shadow-sm border border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-500">{t('month_revenue')}</span>
+            <div className="p-2 bg-blue-500/10 rounded-lg">
+              <TrendingUp size={16} className="text-blue-500" />
             </div>
           </div>
-          <p className="text-2xl font-black text-purple-700 dark:text-purple-300" dir="ltr">
-            {fmt(stats.combinedCost)}
-          </p>
-          <span className="text-[11px] text-slate-400 mt-1 block">
-            ما تم دفعه لمخازن الجملة
-          </span>
+          <p className="text-2xl font-bold text-blue-500" dir="ltr">{fmt(stats.monthRevenue)}</p>
         </div>
 
-        {/* Net Profit */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-emerald-500/20 bg-emerald-500/5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-              الربح الإجمالي الفعلي
-            </span>
-            <div className="p-2 bg-emerald-500/20 text-emerald-600 rounded-xl">
-              <DollarSign size={18} />
+        <div className="p-5 rounded-xl bg-white dark:bg-[#1f2028] shadow-sm border border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-500">{t('real_profit')}</span>
+            <div className="p-2 bg-green-500/10 rounded-lg">
+              <TrendingDown size={16} className="text-green-500" />
             </div>
           </div>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400" dir="ltr">
-            +{fmt(stats.combinedProfit)}
-          </p>
-          <span className="text-[11px] text-emerald-600/80 mt-1 block font-medium">
-            (المبيعات - تكلفة الشراء)
-          </span>
+          <p className="text-2xl font-bold text-green-500" dir="ltr">{fmt(stats.totalProfit)}</p>
         </div>
 
-        {/* Orders Count & Status */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500">طلبات الزبائن</span>
-            <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-              <ClipboardList size={18} />
+        <div className="p-5 rounded-xl bg-white dark:bg-[#1f2028] shadow-sm border border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-500">{t('active_debts')}</span>
+            <div className="p-2 bg-red-500/10 rounded-lg">
+              <HandCoins size={16} className="text-red-500" />
             </div>
           </div>
-          <p className="text-2xl font-black text-slate-900 dark:text-white">
-            {stats.ordersCount} <span className="text-xs font-normal text-slate-400">طلب</span>
-          </p>
-          <span className="text-[11px] text-amber-600 mt-1 font-bold block">
-            {stats.newOrdersCount > 0 ? `🔥 ${stats.newOrdersCount} طلب جديد بانتظار التأكيد` : 'جميع الطلبات معالجة'}
-          </span>
+          <p className="text-2xl font-bold text-red-500" dir="ltr">{fmt(stats.pendingDebts)}</p>
         </div>
       </div>
 
@@ -558,96 +415,6 @@ export const Dashboard = () => {
           </div>
         </div>
       )}
-      {/* Products Movement Analytics (On-Demand & Cartons) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Top Moving Products */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>أكثر المنتجات طلباً (بالكرتونة)</span>
-            </h3>
-            <span className="text-[11px] text-emerald-600 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-              رائجة 🔥
-            </span>
-          </div>
-
-          {stats.topMovingProducts.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">لا توجد مبيعات مسجلة حتى الآن</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.topMovingProducts.map((p, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-600 font-black flex items-center justify-center text-[10px]">
-                      {idx + 1}
-                    </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{p.name}</span>
-                  </div>
-                  <span className="font-mono font-bold text-emerald-600">
-                    {p.count} {p.unit}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Least Moving Products */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span>أقل المنتجات حركة</span>
-            </h3>
-            <span className="text-[11px] text-amber-600 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full">
-              طلب منخفض ⚠️
-            </span>
-          </div>
-
-          {stats.leastMovingProducts.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">لا توجد بيانات كافية</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.leastMovingProducts.map((p, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs">
-                  <span className="font-bold text-slate-800 dark:text-slate-200">{p.name}</span>
-                  <span className="font-mono text-slate-500">
-                    {p.count} {p.unit}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Stagnant Products */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#1f2028] shadow-xs border border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-              <span>منتجات لم تتحرك مطلقاً</span>
-            </h3>
-            <span className="text-[11px] text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-              راكدة 0 طلب
-            </span>
-          </div>
-
-          {stats.stagnantProducts.length === 0 ? (
-            <p className="text-xs text-emerald-600 font-bold py-4 text-center">ممتاز! جميع المنتجات تحركت</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.stagnantProducts.map((p, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-xs">
-                  <span className="font-bold text-slate-800 dark:text-slate-200">{p.name}</span>
-                  <span className="text-[11px] text-slate-400">لم تُطلب بعد</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
       {showZReport && (
         <ZReportModal
           invoices={data.invoices}
@@ -657,8 +424,6 @@ export const Dashboard = () => {
       )}
       
       {showSubscriptionModal && <SubscriptionModal onClose={() => setShowSubscriptionModal(false)} />}
-      
-      {showQrModal && <StoreQRCodeModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} />}
     </div>
   );
 };
