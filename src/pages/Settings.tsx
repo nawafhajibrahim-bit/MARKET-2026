@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { RefreshCcw, CheckCircle, AlertCircle, Coins, Printer, Download, Upload, Trash2, Play, HardDrive, FolderOpen, FolderX, UserCheck, X, BookOpen, Info, ArrowUpCircle, ShieldCheck, AlertTriangle, QrCode, MessageCircle, ShoppingBag } from 'lucide-react';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { useDb } from '../database/Provider';
+import { StoreQRCodeModal } from '../components/StoreQRCodeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getCurrenciesList, addCustomCurrency, getOfficialCurrency, setOfficialCurrency, getPOSExchangeRate, setPOSExchangeRate, getPOSHelperCurrency, setPOSHelperCurrency, getIsHelperCurrencyEnabled, setIsHelperCurrencyEnabled } from '../utils/currency';
 import { getLocalBackups, deleteLocalBackup, type LocalBackup } from '../services/backupStorageService';
@@ -139,12 +140,14 @@ export const Settings = () => {
   const [currencyError, setCurrencyError] = useState<string | null>(null);
   const [currencySuccess, setCurrencySuccess] = useState<string | null>(null);
 
-  // Print settings states
+  // Print & Store settings states
   const [shopName, setShopName] = useState(() => localStorage.getItem('receipt_shop_name') || '');
   const [shopPhone, setShopPhone] = useState(() => localStorage.getItem('receipt_shop_phone') || '');
+  const [marketWhatsappNumber, setMarketWhatsappNumber] = useState(() => localStorage.getItem('market_whatsapp_number') || '9647510171376');
   const [shopAddress, setShopAddress] = useState(() => localStorage.getItem('receipt_shop_address') || '');
   const [receiptFooter, setReceiptFooter] = useState(() => localStorage.getItem('receipt_footer') || '');
   const [printSuccess, setPrintSuccess] = useState<string | null>(null);
+  const [showStoreQrModal, setShowStoreQrModal] = useState(false);
 
   // POS Shortcuts settings
   const [shortcutsQtyEnabled, setShortcutsQtyEnabled] = useState(() => localStorage.getItem('pos_shortcuts_qty_enabled') === 'true');
@@ -179,9 +182,10 @@ export const Settings = () => {
     e.preventDefault();
     localStorage.setItem('receipt_shop_name', shopName);
     localStorage.setItem('receipt_shop_phone', shopPhone);
+    localStorage.setItem('market_whatsapp_number', marketWhatsappNumber.trim());
     localStorage.setItem('receipt_shop_address', shopAddress);
     localStorage.setItem('receipt_footer', receiptFooter);
-    setPrintSuccess(t('print_settings_saved') || 'Print settings saved successfully');
+    setPrintSuccess(t('print_settings_saved') || 'تم حفظ إعدادات المتجر والفاتورة بنجاح');
     setTimeout(() => setPrintSuccess(null), 3000);
   };
 
@@ -1308,7 +1312,7 @@ export const Settings = () => {
 
         <form onSubmit={handleSavePrintSettings} className="space-y-6">
             {/* Shop Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-black/5 dark:border-white/5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-black/5 dark:border-white/5">
                 <div>
                     <label className="block text-sm font-medium mb-1">{t('shop_name')}</label>
                     <input 
@@ -1328,6 +1332,23 @@ export const Settings = () => {
                         placeholder="e.g. +964 770 000 0000"
                         className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none transition-all"
                     />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                        <MessageCircle size={15} />
+                        {isAr ? 'رقم واتساب الطلبات' : 'Orders WhatsApp'}
+                    </label>
+                    <input 
+                        type="text"
+                        value={marketWhatsappNumber}
+                        onChange={(e) => setMarketWhatsappNumber(e.target.value)}
+                        placeholder="e.g. 9647510171376"
+                        dir="ltr"
+                        className="w-full px-4 py-2 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 focus:border-emerald-500 outline-none transition-all font-mono"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      {isAr ? 'يستقبل رسائل الطلبات من متجر الزبائن' : 'Receives order messages from storefront'}
+                    </p>
                 </div>
             </div>
 
@@ -1354,7 +1375,26 @@ export const Settings = () => {
                 </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-black/5 dark:border-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-black/5 dark:border-white/5">
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowStoreQrModal(true)}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                    >
+                        <QrCode size={16} />
+                        {isAr ? 'رمز QR للمتجر' : 'Store QR Code'}
+                    </button>
+                    <a
+                        href="/store"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3.5 py-2 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5"
+                    >
+                        <ShoppingBag size={15} />
+                        {isAr ? 'معاينة المتجر' : 'Preview Store'}
+                    </a>
+                </div>
                 <button 
                     type="submit"
                     className="px-6 py-2 bg-[var(--color-primary)] text-white font-semibold rounded-lg hover:brightness-110 active:scale-95 transition-all cursor-pointer"
@@ -1903,6 +1943,9 @@ export const Settings = () => {
           </div>
         </div>
       )}
+
+      {/* Store QR Code Modal */}
+      <StoreQRCodeModal isOpen={showStoreQrModal} onClose={() => setShowStoreQrModal(false)} />
     </div>
   );
 };

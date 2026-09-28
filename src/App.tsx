@@ -20,6 +20,9 @@ const Admin = lazy(() => import('./pages/Admin').then(m => ({ default: m.Admin }
 const Debts = lazy(() => import('./pages/Debts').then(m => ({ default: m.Debts })));
 const Purchases = lazy(() => import('./pages/Purchases').then(m => ({ default: m.Purchases })));
 const SalesHistory = lazy(() => import('./pages/SalesHistory').then(m => ({ default: m.SalesHistory })));
+const Orders = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
+const Suppliers = lazy(() => import('./pages/Suppliers').then(m => ({ default: m.Suppliers })));
+const Store = lazy(() => import('./pages/Store').then(m => ({ default: m.Store })));
 const LoginScreen = lazy(() => import('./pages/Login').then(m => ({ default: m.LoginScreen })));
 const DevReset = lazy(() => import('./pages/DevReset').then(m => ({ default: m.DevReset })));
 
@@ -163,10 +166,15 @@ function App() {
             {/* Standalone Admin route for the program owner - only requires ADMIN_SECRET */}
             <Route path="/owner-portal" element={<Admin />} />
 
+            {/* Public Customer Storefront — accessible to any customer without auth or license block */}
+            <Route path="/store" element={<Store />} />
+
             <Route path="/" element={<LicenseInterceptor><AuthGuard><Layout /></AuthGuard></LicenseInterceptor>}>
               <Route index element={<Dashboard />} />
+              <Route path="orders" element={<Orders />} />
               <Route path="pos" element={<POS />} />
               <Route path="inventory" element={<AdminGuard><Inventory /></AdminGuard>} />
+              <Route path="suppliers" element={<AdminGuard><Suppliers /></AdminGuard>} />
               <Route path="purchases" element={<AdminGuard><Purchases /></AdminGuard>} />
               <Route path="settings" element={<AdminGuard><Settings /></AdminGuard>} />
               <Route path="debts" element={<Debts />} />

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إعلان برنامج سمارت ماركت - Smart Market POS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080d14;
+      color: #fff;
+      font-family: 'Cairo', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 15px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+      border: none;
+      padding: 13px 26px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+      font-family: 'Cairo', sans-serif;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+    }
+    .btn-secondary {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
+    }
+
+    /* Ad Poster Container - 1080x1080 Square for Social Media */
+    .ad-poster {
+      width: 1080px;
+      height: 1080px;
+      background: radial-gradient(circle at 85% 15%, #0d3832 0%, #081622 55%, #04080e 100%);
+      border-radius: 28px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+      border: 1.5px solid rgba(16, 185, 129, 0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 55px 65px;
+      transform-origin: top center;
+    }
+
+    .glow-circle-1 {
+      position: absolute;
+      top: -120px;
+      left: -120px;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.28), transparent 70%);
+      pointer-events: none;
+    }
+    .glow-circle-2 {
+      position: absolute;
+      bottom: -100px;
+      right: -100px;
+      width: 550px;
+      height: 550px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.22), transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .brand-icon {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
+    }
+    .brand-name {
+      font-size: 40px;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1.1;
+    }
+    .brand-sub {
+      color: #34d399;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .urgent-badge {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 50px;
+      font-size: 22px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      animation: pulse 2.5s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    /* Main Headline */
+    .main-body {
+      position: relative;
+      z-index: 2;
+    }
+    .top-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      padding: 8px 24px;
+      border-radius: 30px;
+      color: #34d399;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .hero-title {
+      font-size: 54px;
+      font-weight: 900;
+      line-height: 1.28;
+      color: #ffffff;
+      margin-bottom: 16px;
+      font-family: 'Tajawal', sans-serif;
+    }
+    .hero-title span.highlight-green {
+      color: #10b981;
+      text-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+    }
+    .hero-title span.highlight-blue {
+      color: #38bdf8;
+      text-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
+    }
+    .hero-title span.highlight-gold {
+      color: #f59e0b;
+      text-shadow: 0 0 25px rgba(245, 158, 11, 0.4);
+    }
+
+    /* Urgency banner strip */
+    .urgency-strip {
+      background: linear-gradient(90deg, rgba(239, 68, 68, 0.18), rgba(245, 158, 11, 0.18));
+      border-right: 5px solid #ef4444;
+      border-radius: 12px;
+      padding: 14px 22px;
+      font-size: 21px;
+      font-weight: 700;
+      color: #fef08a;
+      margin-bottom: 26px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* 4 Feature Columns */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 26px;
+    }
+    .feature-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      padding: 20px 16px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #059669);
+    }
+    .card-ai::before { background: linear-gradient(90deg, #38bdf8, #818cf8); }
+    .card-custom::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .card-offline::before { background: linear-gradient(90deg, #10b981, #3b82f6); }
+
+    .card-icon {
+      font-size: 34px;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .card-text {
+      font-size: 15px;
+      color: #94a3b8;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+
+    /* Bottom CTA Bar */
+    .bottom-cta {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2));
+      border: 1.5px solid rgba(52, 211, 153, 0.4);
+      border-radius: 22px;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+    .cta-text-group h3 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .cta-text-group p {
+      font-size: 17px;
+      color: #34d399;
+      font-weight: 700;
+    }
+    .contact-box {
+      text-align: left;
+      direction: ltr;
+    }
+    .contact-badge {
+      display: inline-block;
+      background: #10b981;
+      color: #042f2e;
+      padding: 10px 22px;
+      border-radius: 12px;
+      font-size: 20px;
+      font-weight: 900;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Scaling for preview screens */
+    @media (max-width: 1150px) {
+      .ad-poster {
+        transform: scale(0.65);
+        margin-bottom: -350px;
+      }
+    }
+    @media (max-width: 768px) {
+      .ad-poster {
+        transform: scale(0.35);
+        margin-bottom: -650px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <button class="btn" onclick="downloadPoster()">
+      💾 حفظ الإعلان كصورة عالية الدقة (PNG)
+    </button>
+    <button class="btn btn-secondary" onclick="copyAdText()">
+      📋 نسخ نص المنشور الإعلاني
+    </button>
+  </div>
+
+  <div class="ad-poster" id="adPoster">
+    <div class="glow-circle-1"></div>
+    <div class="glow-circle-2"></div>
+
+    <!-- Header -->
+    <div class="header">
+      <div class="brand-group">
+        <div class="brand-icon">🛒</div>
+        <div>
+          <div class="brand-name">برنامج سمارت ماركت</div>
+          <div class="brand-sub">نظام إدارة ونقاط بيع الماركت ومحلات التجزئة</div>
+        </div>
+      </div>
+      <div class="urgent-badge">
+        <span>⏳</span>
+        <span>سنة مجاناً - سارع قبل الإغلاق!</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-body">
+      <div class="top-pill">
+        ⚡ نظام كاشير متكامل بميزات ذكية غير مسبوقة
+      </div>
+
+      <h1 class="hero-title">
+        أدر مبيعات متجرك بأحدث تقنيات <span class="highlight-blue">الذكاء الاصطناعي</span><br>
+        مع فترة تجريبية مجانية مفتوحة <span class="highlight-gold">لمدة سنة كاملة</span>!
+      </h1>
+
+      <div class="urgency-strip">
+        <span>⚠️</span>
+        <span>العرض مجاني بالكامل حالياً لمدة سنة كاملة، ولكن التسجيل قد يُغلق في أي لحظة! احجز نسختك الآن.</span>
+      </div>
+
+      <!-- Feature Grid -->
+      <div class="feature-grid">
+        <!-- 1: Free Trial Urgency -->
+        <div class="feature-card">
+          <div class="card-icon">🎁</div>
+          <div class="card-title">مجاني لسنة كاملة</div>
+          <div class="card-text">
+            تمتع بجميع ميزات النظام مجاناً لمدة عام كامل حالياً دون أي رسوم، مع إمكانية إنهاء العرض في أي وقت.
+          </div>
+        </div>
+
+        <!-- 2: AI Power -->
+        <div class="feature-card card-ai">
+          <div class="card-icon">🤖</div>
+          <div class="card-title">مساعد ذكاء اصطناعي</div>
+          <div class="card-text">
+            تحليل ذكي للمبيعات، توقع النواقص، تقارير فورية للأرباح، وإجابة ذكية على كل أسئلتك حول متجرك.
+          </div>
+        </div>
+
+        <!-- 3: Customization & Feedback -->
+        <div class="feature-card card-custom">
+          <div class="card-icon">🛠️</div>
+          <div class="card-title">جاهزون لأي تعديل</div>
+          <div class="card-text">
+            نستمع لملاحظاتكم ومستعدون لتعديل وتطوير البرنامج وإضافة أي ميزة خاصة تناسب نشاطك التجاري.
+          </div>
+        </div>
+
+        <!-- 4: Offline & Fast POS -->
+        <div class="feature-card card-offline">
+          <div class="card-icon">⚡</div>
+          <div class="card-title">ميزات بيع شاملة</div>
+          <div class="card-text">
+            يعمل بدون إنترنت، باركود سريع، طباعة فواتير، جرد مخزون، ديون عملاء، ونسخ احتياطي فوري بضغطة زر.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom CTA Bar -->
+    <div class="bottom-cta">
+      <div class="cta-text-group">
+        <h3>🚀 اغتنم الفرصة وابدأ تشغيل برنامجك مجاناً الآن!</h3>
+        <p>تواصل معنا للاشتراك وتجربة النظام وتخصيصه لمتجرك فوراً</p>
+      </div>
+      <div class="contact-box">
+        <span class="contact-badge">اطلب نسختك المجانية الآن 💬</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function downloadPoster() {
+      const poster = document.getElementById('adPoster');
+      const originalTransform = poster.style.transform;
+      poster.style.transform = 'none';
+
+      html2canvas(poster, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#080d14'
+      }).then(canvas => {
+        poster.style.transform = originalTransform;
+        const link = document.createElement('a');
+        link.download = 'smart-market-arabic-ad.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).catch(err => {
+        poster.style.transform = originalTransform;
+        alert('حدث خطأ أثناء تحميل الصورة: ' + err);
+      });
+    }
+
+    function copyAdText() {
+      const text = `📢 عرض استثنائي لأصحاب المتاجر والسوبرماركت والماركت! 🛒✨
+
+هل تبحث عن برنامج كاشير ومبيعات حديث يريحك من فوضى الحسابات ويضاعف أرباحك؟
+نقدم لكم **برنامج سمارت ماركت (Smart Market POS)** مع أقوى الميزات المدعومة بالذكاء الاصطناعي 🚀
+
+🔥 تفاصيل العرض والمميزات:
+1️⃣ 🎁 **فترة تجريبية مجانية 100% لمدة سنة كاملة حالياً!**
+نعم! البرنامج مفتوح ومجاني تماماً لمدة عام، ولكن يرجى الانتباه أن التسجيل المجاني متاح حالياً **وقد يتم إغلاقه في أي لحظة**، فسارع بحجز نسختك الآن!
+
+2️⃣ 🤖 **مدعوم بالذكاء الاصطناعي الذكي (AI)**:
+مساعد متطور يحلل حركة المبيعات، ينبهك بالنواقص والأصناف الراكدة، ويقدم تقارير ذكية لزيادة أرباحك.
+
+3️⃣ 🛠️ **نستقبل جميع الملاحظات ومستعدون لأي تعديل**:
+رأيك هو أساس تطويرنا! فريقنا مستعد لتنفيذ أي تعديل، إضافة ميزات، وتخصيص البرنامج بالكامل ليتناسب تماماً مع طريقة عمل متجرك.
+
+4️⃣ ⚡ **ميزات متقدمة ومتعددة**:
+• يعمل بكفاءة تامة **حتى بدون إنترنت (Offline)** لضمان استمرار البيع دائماً.
+• قارئ باركود فائق السرعة وطباعة فواتير فورية.
+• إدارة دقيقة للمخزون وجرد المنتجات وديون العملاء والموردين.
+• نسخ احتياطي محلي بضغطة زر لحماية بياناتك.
+
+📲 **سارع بالتواصل معنا الآن لتفعيل نسختك المجانية وتجربة النظام ومشاركتنا اقتراحاتك!**`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert('✅ تم نسخ نص الإعلان بنجاح! جاهز للنشر على فيسبوك، واتساب، وانستغرام.');
+      });
+    }
+  </script>
+</body>
+</html>

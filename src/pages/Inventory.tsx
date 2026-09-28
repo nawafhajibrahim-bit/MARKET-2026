@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Plus, AlertTriangle, Trash2, X, Edit3, Download, Camera, Info } from 'lucide-react';
 import { useDb } from '../database/Provider';
-import type { ProductDocType, UnitDocType } from '../database/schema';
+import type { ProductDocType, UnitDocType, SupplierDocType } from '../database/schema';
 import { formatCurrency } from '../utils/currency';
 import { CameraScannerModal } from '../components/CameraScannerModal';
 
@@ -18,7 +18,8 @@ export const Inventory = () => {
   const isAr = i18n.language === 'ar';
 
   const [products, setProducts] = useState<ProductDocType[]>([]);
-  const [unitsMap, setUnitsMap] = useState<Record<string, UnitDocType[]>>({});
+  const [suppliersList, setSuppliersList] = useState<SupplierDocType[]>([]);
+  const [_unitsMap, setUnitsMap] = useState<Record<string, UnitDocType[]>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -31,13 +32,20 @@ export const Inventory = () => {
   const [skuSerial, setSkuSerial] = useState('');
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
+  const [description, setDescription] = useState('');
+  const [image, setImage] = useState('');
   const [category, setCategory] = useState('');
   const [costPrice, setCostPrice] = useState(0);
   const [salePrice, setSalePrice] = useState(0);
+  const [discountPrice, setDiscountPrice] = useState(0);
+  const [badge, setBadge] = useState('');
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [stockQuantity, setStockQuantity] = useState(0);
   const [minSafetyStock, setMinSafetyStock] = useState(5);
   const [expiryDate, setExpiryDate] = useState('');
-  const [unit, setUnit] = useState<string>('piece');
+  const [unit, setUnit] = useState<string>('كرتونة');
   const [editStockMode, setEditStockMode] = useState<'replenish' | 'direct'>('replenish');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
@@ -65,14 +73,21 @@ export const Inventory = () => {
         setSkuSerial(p.sku_serial || '');
         setNameAr(p.name_ar);
         setNameEn(p.name_en || '');
+        setDescription(p.description || '');
+        setImage(p.image || '');
         setCategory(p.category || '');
         setCostPrice(p.cost_price);
         setSalePrice(p.sale_price);
+        setDiscountPrice(p.discount_price || 0);
+        setBadge(p.badge || '');
+        setIsAvailable(p.is_available !== false);
+        setSupplierName(p.supplier_name || '');
+        setSupplierId(p.supplier_id || '');
         setEditStockMode('replenish');
         setStockQuantity(0);
         setMinSafetyStock(p.min_safety_stock ?? 5);
         setExpiryDate(p.expiry_date || '');
-        setUnit(p.unit || 'piece');
+        setUnit(p.unit || 'كرتونة');
         
         const units = await db.units.find({ selector: { product_id: p.id } }).exec();
         setAdditionalUnits(units.map(u => {
@@ -93,14 +108,21 @@ export const Inventory = () => {
     setSkuSerial(product.sku_serial || '');
     setNameAr(product.name_ar);
     setNameEn(product.name_en || '');
+    setDescription(product.description || '');
+    setImage(product.image || '');
     setCategory(product.category || '');
     setCostPrice(product.cost_price);
     setSalePrice(product.sale_price);
+    setDiscountPrice(product.discount_price || 0);
+    setBadge(product.badge || '');
+    setIsAvailable(product.is_available !== false);
+    setSupplierName(product.supplier_name || '');
+    setSupplierId(product.supplier_id || '');
     setEditStockMode('replenish');
     setStockQuantity(0);
     setMinSafetyStock(product.min_safety_stock ?? 5);
     setExpiryDate(product.expiry_date || '');
-    setUnit(product.unit || 'piece');
+    setUnit(product.unit || 'كرتونة');
     
     const units = await db.units.find({ selector: { product_id: product.id } }).exec();
     setAdditionalUnits(units.map(u => {
@@ -120,19 +142,26 @@ export const Inventory = () => {
     setSkuSerial('');
     setNameAr('');
     setNameEn('');
+    setDescription('');
+    setImage('');
     setCategory('');
     setCostPrice(0);
     setSalePrice(0);
+    setDiscountPrice(0);
+    setBadge('');
+    setIsAvailable(true);
+    setSupplierName('');
+    setSupplierId('');
     setEditStockMode('replenish');
     setStockQuantity(0);
     setMinSafetyStock(5);
     setExpiryDate('');
-    setUnit('piece');
+    setUnit('كرتونة');
     setAdditionalUnits([]);
     setShowModal(true);
   };
 
-  // Fetch and subscribe to products & units reactively
+  // Fetch and subscribe to products, units, & suppliers reactively
   useEffect(() => {
     const productsSub = db.products.find().$.subscribe(async (docs) => {
       setProducts(docs.map(d => d.toJSON()));
@@ -150,9 +179,14 @@ export const Inventory = () => {
       setUnitsMap(mapping);
     });
 
+    const suppliersSub = db.suppliers.find().$.subscribe((docs) => {
+      setSuppliersList(docs.map(d => d.toJSON()));
+    });
+
     return () => {
       productsSub.unsubscribe();
       unitsSub.unsubscribe();
+      suppliersSub.unsubscribe();
     };
   }, [db]);
 
@@ -249,9 +283,16 @@ export const Inventory = () => {
             sku_serial: skuSerial || undefined,
             name_ar: nameAr,
             name_en: nameEn || nameAr,
-            category: category || 'General',
+            description: description.trim(),
+            image: image.trim(),
+            category: category || 'عام',
             cost_price: Number(costPrice),
             sale_price: Number(salePrice),
+            discount_price: Number(discountPrice) || 0,
+            badge: badge.trim(),
+            is_available: isAvailable,
+            supplier_name: supplierName.trim(),
+            supplier_id: supplierId.trim(),
             stock_quantity: finalStock,
             min_safety_stock: Number(minSafetyStock),
             expiry_date: expiryDate || undefined,
@@ -286,9 +327,16 @@ export const Inventory = () => {
           sku_serial: skuSerial || undefined,
           name_ar: nameAr,
           name_en: nameEn || nameAr,
-          category: category || 'General',
+          description: description.trim(),
+          image: image.trim(),
+          category: category || 'عام',
           cost_price: Number(costPrice),
           sale_price: Number(salePrice),
+          discount_price: Number(discountPrice) || 0,
+          badge: badge.trim(),
+          is_available: isAvailable,
+          supplier_name: supplierName.trim(),
+          supplier_id: supplierId.trim(),
           stock_quantity: Number(stockQuantity),
           min_safety_stock: Number(minSafetyStock),
           expiry_date: expiryDate || undefined,
@@ -314,9 +362,16 @@ export const Inventory = () => {
       setSkuSerial('');
       setNameAr('');
       setNameEn('');
+      setDescription('');
+      setImage('');
       setCategory('');
       setCostPrice(0);
       setSalePrice(0);
+      setDiscountPrice(0);
+      setBadge('');
+      setIsAvailable(true);
+      setSupplierName('');
+      setSupplierId('');
       setStockQuantity(0);
       setMinSafetyStock(5);
       setExpiryDate('');
@@ -514,62 +569,84 @@ export const Inventory = () => {
         <table className="w-full text-left border-collapse" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
           <thead>
             <tr className="bg-black/5 dark:bg-white/5 text-sm uppercase tracking-wider text-gray-500">
-              <th className="p-4 font-medium">{t('barcode')}</th>
-              <th className="p-4 font-medium">{t('product_name')}</th>
+              <th className="p-4 font-medium">المنتج</th>
               <th className="p-4 font-medium">{t('category')}</th>
-              <th className="p-4 font-medium">{t('price')}</th>
-              <th className="p-4 font-medium text-center">{t('stock')}</th>
-              <th className="p-4 font-medium text-center">{t('status')}</th>
-              <th className="p-4 font-medium text-center"></th>
+              <th className="p-4 font-medium">وحدة البيع</th>
+              <th className="p-4 font-medium">سعر البيع للزبون</th>
+              <th className="p-4 font-medium text-purple-600 dark:text-purple-400">
+                سعر الشراء (سري 🔒)
+              </th>
+              <th className="p-4 font-medium">المورد</th>
+              <th className="p-4 font-medium text-center">حالة التوفر بالمتجر</th>
+              <th className="p-4 font-medium text-center">إجراءات</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/5 dark:divide-white/5">
             {filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-gray-500">
+                <td colSpan={8} className="p-8 text-center text-gray-500">
                   {t('no_products_found')}
                 </td>
               </tr>
             ) : (
               paginatedProducts.map((p) => {
                 const isAr = i18n.language === 'ar';
-                const displayName = isAr ? p.name_ar : p.name_en;
-                const associatedUnits = unitsMap[p.id] || [];
+                const displayName = isAr ? p.name_ar : (p.name_en || p.name_ar);
 
                 return (
                   <tr key={p.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                    <td className="p-4 font-mono text-sm">{p.barcode}</td>
                     <td className="p-4 font-medium">
-                      <div>
-                        <div>{displayName}</div>
-                        {associatedUnits.length > 0 && (
-                          <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-2">
-                            {associatedUnits.map((u, i) => (
-                              <span key={i} className="bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded">
-                                {u.unit_name} (x{u.conversion_factor}) : {formatCurrency(u.price_per_unit)}
-                              </span>
-                            ))}
+                      <div className="flex items-center gap-3">
+                        {p.image ? (
+                          <img src={p.image} alt={displayName} className="w-10 h-10 rounded-lg object-cover border" onError={(e) => (e.target as HTMLElement).style.display = 'none'} />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-600 flex items-center justify-center font-bold text-xs">
+                            {p.unit || 'كرتونة'}
                           </div>
                         )}
+                        <div>
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>{displayName}</span>
+                            {p.badge && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-bold">
+                                {p.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 font-mono mt-0.5">
+                            {p.barcode}
+                          </div>
+                        </div>
                       </div>
                     </td>
-                     <td className="p-4 text-gray-500 text-sm">{(p.category === 'General' || p.category === 'general') ? t('general') : p.category}</td>
-                    <td className="p-4 font-mono text-sm" dir="ltr">
-                      {formatCurrency(p.sale_price)}
+                    <td className="p-4 text-gray-500 text-sm">
+                      {p.category || 'عام'}
+                    </td>
+                    <td className="p-4 text-sm font-bold text-slate-700 dark:text-slate-300">
+                      {p.unit || 'كرتونة'}
+                    </td>
+                    <td className="p-4 font-mono text-sm font-black" dir="ltr">
+                      {formatCurrency(p.discount_price && p.discount_price > 0 ? p.discount_price : p.sale_price)}
+                      {p.discount_price && p.discount_price > 0 && (
+                        <span className="text-xs text-gray-400 line-through mr-1 font-normal">
+                          {formatCurrency(p.sale_price)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4 font-mono text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-500/5" dir="ltr">
+                      {formatCurrency(p.cost_price)}
+                    </td>
+                    <td className="p-4 text-xs text-slate-600 dark:text-slate-400">
+                      {p.supplier_name || '—'}
                     </td>
                     <td className="p-4 text-center">
-                      <span className="inline-flex items-center justify-center min-w-[3rem] px-2.5 py-1 rounded bg-gray-100 dark:bg-gray-800 font-mono text-sm gap-1">
-                        {p.stock_quantity} <span className="text-[10px] text-gray-500 font-sans">{t(`unit_${p.unit || 'piece'}`, { defaultValue: p.unit || 'piece' })}</span>
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      {p.stock_quantity <= (p.min_safety_stock ?? 0) ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-orange-500 bg-orange-500/10 px-2.5 py-1 rounded-full font-medium">
-                          <AlertTriangle size={12} /> {t('low_stock')}
+                      {p.is_available !== false ? (
+                        <span className="inline-flex text-xs text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full font-bold">
+                          ✓ متوفر للطلب
                         </span>
                       ) : (
-                        <span className="inline-flex text-xs text-green-500 bg-green-500/10 px-2.5 py-1 rounded-full font-medium">
-                          {t('good')}
+                        <span className="inline-flex text-xs text-slate-500 bg-slate-500/10 px-2.5 py-1 rounded-full font-medium">
+                          غير متوفر (مخفي)
                         </span>
                       )}
                     </td>
@@ -577,13 +654,15 @@ export const Inventory = () => {
                       <div className="flex items-center justify-center gap-1.5">
                         <button 
                           onClick={() => handleOpenEdit(p)}
-                          className="text-[var(--color-primary)] hover:text-purple-700 p-1 hover:bg-[var(--color-primary)]/10 rounded-lg transition-colors cursor-pointer"
+                          className="text-[var(--color-primary)] hover:text-purple-700 p-1.5 hover:bg-[var(--color-primary)]/10 rounded-lg transition-colors cursor-pointer"
+                          title="تعديل المنتج"
                         >
                           <Edit3 size={16} />
                         </button>
                         <button 
                           onClick={() => setDeleteConfirmId(p.id)}
-                          className="text-red-500 hover:text-red-700 p-1 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                          className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                          title="حذف"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -667,7 +746,7 @@ export const Inventory = () => {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-1">{t('product_name')}</label>
+                  <label className="block text-sm font-medium mb-1">{t('product_name')} *</label>
                   <input 
                     type="text" 
                     required
@@ -676,9 +755,39 @@ export const Inventory = () => {
                       setNameAr(e.target.value);
                     }}
                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                    placeholder={i18n.language === 'ar' ? 'ماء معدني 500 مل' : 'Mineral Water 500ml'}
+                    placeholder={i18n.language === 'ar' ? 'مثال: زيت طهي نقي (كرتونة 12 عبوة)' : 'Product Name'}
                   />
                 </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">وصف مختصر للمنتج (يظهر للزبون)</label>
+                  <textarea 
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none text-xs"
+                    placeholder="مواصفات وحجم العبوة والكرتونة..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">رابط صورة المنتج (Image URL)</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="url" 
+                      value={image}
+                      onChange={(e) => setImage(e.target.value)}
+                      className="flex-1 px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none text-xs"
+                      placeholder="https://example.com/image.jpg"
+                    />
+                    {image && (
+                      <div className="w-10 h-10 rounded-lg border overflow-hidden shrink-0">
+                        <img src={image} alt="Preview" className="w-full h-full object-cover" onError={(e) => (e.target as HTMLElement).style.display = 'none'} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                  <div>
                    <label className="block text-sm font-medium mb-1">{t('category')}</label>
                    <input 
@@ -686,29 +795,33 @@ export const Inventory = () => {
                      value={category}
                      onChange={(e) => setCategory(e.target.value)}
                      className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none"
-                     placeholder="Drinks"
+                     placeholder="المواد الغذائية، أرز وزيوت..."
                    />
                  </div>
+
                  <div>
-                   <label className="block text-sm font-medium mb-1">{t('base_unit_label')}</label>
+                   <label className="block text-sm font-medium mb-1">وحدة البيع الأساسية للزبون</label>
                    <select 
                      value={unit}
                      onChange={(e) => setUnit(e.target.value)}
-                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer"
+                     className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer font-bold"
                    >
-                     <option value="piece">{t('unit_piece')}</option>
-                     <option value="kg">{t('unit_kg')}</option>
-                     <option value="gram">{t('unit_gram')}</option>
-                     <option value="liter">{t('unit_liter')}</option>
-                     <option value="ml">{t('unit_ml')}</option>
-                     <option value="box">{t('unit_box')}</option>
-                     <option value="carton">{t('unit_carton')}</option>
-                     <option value="bag">{t('unit_bag')}</option>
-                     <option value="meter">{t('unit_meter')}</option>
+                     <option value="كرتونة">كرتونة (الاستخدام الأساسي)</option>
+                     <option value="صندوق">صندوق</option>
+                     <option value="باكيت">باكيت</option>
+                     <option value="كمية">كمية</option>
+                     <option value="قطعة">قطعة</option>
+                     <option value="كيس">كيس</option>
+                     <option value="علبة">علبة</option>
+                     <option value="kg">كيلوجرام (kg)</option>
+                     <option value="liter">لتر (L)</option>
                    </select>
                  </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">{t('cost_price_label')}</label>
+                  <label className="block text-sm font-medium mb-1">
+                    سعر الشراء من المورد <span className="text-purple-600 text-xs font-bold">(سري وخاص بالإدارة فقط 🔒)</span>
+                  </label>
                   <input 
                     type="number" 
                     step="any"
@@ -716,12 +829,14 @@ export const Inventory = () => {
                     required
                     value={costPrice || ''}
                     onChange={(e) => setCostPrice(Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono"
+                    className="w-full px-4 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 focus:border-purple-600 outline-none font-mono font-bold text-purple-700 dark:text-purple-300"
                     placeholder="0.00"
                   />
+                  <span className="text-[11px] text-gray-400 mt-0.5 block">لن يظهر للزبون بأي شكل</span>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">{t('sale_price_label')}</label>
+                  <label className="block text-sm font-medium mb-1">سعر البيع للزبون *</label>
                   <input 
                     type="number" 
                     step="any"
@@ -729,9 +844,73 @@ export const Inventory = () => {
                     required
                     value={salePrice || ''}
                     onChange={(e) => setSalePrice(Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono"
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono font-bold text-base"
                     placeholder="0.00"
                   />
+                  <span className="text-[11px] text-gray-400 mt-0.5 block">السعر الظاهر للزبون في المتجر</span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">سعر الخصم / العرض (اختياري)</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    min="0"
+                    value={discountPrice || ''}
+                    onChange={(e) => setDiscountPrice(Number(e.target.value))}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none font-mono"
+                    placeholder="إذا كان هناك خصم"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">شارة العرض (تظهر فوق المنتج)</label>
+                  <select 
+                    value={badge}
+                    onChange={(e) => setBadge(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer"
+                  >
+                    <option value="">بدون شارة</option>
+                    <option value="عرض خاص">عرض خاص</option>
+                    <option value="خصم">خصم</option>
+                    <option value="سعر مميز">سعر مميز</option>
+                    <option value="الأكثر طلباً">الأكثر طلباً</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">المورد الذي أشتري منه المنتج</label>
+                  <select 
+                    value={supplierName}
+                    onChange={(e) => {
+                      const selected = suppliersList.find(s => s.name === e.target.value);
+                      setSupplierName(e.target.value);
+                      setSupplierId(selected ? selected.supplier_id : '');
+                    }}
+                    className="w-full px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 border border-transparent focus:border-[var(--color-primary)] outline-none cursor-pointer"
+                  >
+                    <option value="">-- اختر مورد الجملة --</option>
+                    {suppliersList.map(s => (
+                      <option key={s.supplier_id} value={s.name}>
+                        {s.name} {s.store_name ? `(${s.store_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3 pt-6">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isAvailable} 
+                      onChange={(e) => setIsAvailable(e.target.checked)} 
+                      className="sr-only peer" 
+                    />
+                    <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                    {isAvailable ? 'المنتج متوفر ومتاح للطلب بالمتجر' : 'غير متوفر حالياً (مخفي عن الزبون)'}
+                  </span>
                 </div>
 
                 {/* Live Profit Preview */}

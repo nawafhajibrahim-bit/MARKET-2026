@@ -76,15 +76,17 @@ export default function AIEngine() {
     },
     {
       icon: <Package size={14} />,
-      labelAr: '📦 المخزون والمنتجات',
-      labelEn: '📦 Inventory & Products',
+      labelAr: '📦 طلبات الزبائن والبيع بالكرتونة',
+      labelEn: '📦 On-Demand Orders & Cartons',
       color: 'emerald',
       questions: [
-        { ar: 'ما هي المنتجات التي ستنفد قريباً؟', en: 'Which products are running low?' },
-        { ar: 'ما هي المنتجات التي لم تُباع أبداً؟', en: 'Which products have never been sold?' },
-        { ar: 'ما هو المنتج الأعلى ربحاً؟', en: 'Which product has the highest profit?' },
-        { ar: 'ما هي المنتجات القريبة من انتهاء الصلاحية؟', en: 'Which products are near expiry?' },
-        { ar: 'ما هي أكثر الفئات مبيعاً؟', en: 'What are the best-selling categories?' },
+        { ar: 'ما هو المنتج الأكثر طلباً بالكرتونة هذا الأسبوع؟', en: 'What is the most demanded product by carton?' },
+        { ar: 'ما هي المنتجات التي انخفض الطلب عليها؟', en: 'Which products had a decline in demand?' },
+        { ar: 'ما هي المنتجات التي تحقق هامش ربح ممتاز وتستحق التركيز؟', en: 'Which products have great profit margins?' },
+        { ar: 'ما هي المنتجات كثيرة الطلب لكن هامش ربحها منخفض؟', en: 'Which products have high demand but low profit margin?' },
+        { ar: 'ما هي المنتجات التي تقترح عمل عرض أو خصم عليها لتنشيطها؟', en: 'Which products should I offer a discount on?' },
+        { ar: 'ما هي المنتجات التي تُشترى معاً في نفس الطلب غالباً؟', en: 'Which products are frequently bought together?' },
+        { ar: 'ما هي المنتجات الراكدة التي لم تتحرك مطلقاً؟', en: 'Which products are completely stagnant?' }
       ]
     },
     {
@@ -101,26 +103,24 @@ export default function AIEngine() {
     },
     {
       icon: <Truck size={14} />,
-      labelAr: '🚚 الموردين والمشتريات',
-      labelEn: '🚚 Suppliers & Purchases',
+      labelAr: '🚚 الموردين والشراء من الجملة',
+      labelEn: '🚚 Wholesale Suppliers',
       color: 'violet',
       questions: [
-        { ar: 'من هو أفضل مورد لدينا؟', en: 'Who is our best supplier?' },
-        { ar: 'ما هو إجمالي المشتريات هذا الشهر؟', en: 'What are total purchases this month?' },
-        { ar: 'كم المبالغ غير المدفوعة للموردين؟', en: 'How much is owed to suppliers?' },
+        { ar: 'من هو أكثر مورد أشتري منه منتجات؟', en: 'Which supplier do I buy the most from?' },
+        { ar: 'كم إجمالي ما دفعته للموردين حتى الآن؟', en: 'How much was spent on suppliers so far?' },
+        { ar: 'ما هو متوسط تكلفة الشراء مقارنة بسعر البيع؟', en: 'What is the average purchase cost vs sale price?' },
       ]
     },
     {
       icon: <Lightbulb size={14} />,
-      labelAr: '💡 استشارات واقتراحات',
-      labelEn: '💡 Advice & Suggestions',
+      labelAr: '💡 نصائح وقرارات تجارية',
+      labelEn: '💡 Business Advice',
       color: 'rose',
       questions: [
-        { ar: 'كيف يمكنني زيادة المبيعات؟', en: 'How can I increase sales?' },
-        { ar: 'كيف أحسن إدارة المخزون؟', en: 'How can I improve inventory management?' },
-        { ar: 'أعطني تقريراً سريعاً عن حالة المحل', en: 'Give me a quick store status report' },
-        { ar: 'ما هي نقاط الضعف في أداء المحل؟', en: 'What are the weaknesses in store performance?' },
-        { ar: 'ما هي المنتجات التي يجب التركيز عليها؟', en: 'Which products should I focus on?' },
+        { ar: 'حلل أداء متجري وقدم لي أهم 3 اقتراحات لزيادة الأرباح', en: 'Analyze performance and give 3 tips to increase profit' },
+        { ar: 'كيف أنسق مع موردي الجملة لتقليل التكلفة وسرعة التوصيل؟', en: 'How to optimize wholesale sourcing?' },
+        { ar: 'ما هي المنتجات التي يفضل توفيرها في المتجر بناءً على حركة الطلبات؟', en: 'Which products should be featured based on demand?' }
       ]
     }
   ];
@@ -308,7 +308,7 @@ export default function AIEngine() {
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
       const fourteenDaysAgoISO = fourteenDaysAgo.toISOString();
 
-      const [productDocs, invoiceDocs, debtDocs, purchaseDocs] = await Promise.all([
+      const [productDocs, invoiceDocs, debtDocs, purchaseDocs, orderDocs] = await Promise.all([
         db.products.find().exec(),
         db.invoices.find({
           selector: { timestamp: { $gte: thirtyDaysAgoISO } }
@@ -317,21 +317,51 @@ export default function AIEngine() {
           selector: { status: { $ne: 'Paid' } }
         }).exec(),
         db.purchases.find().exec(),
+        db.orders ? db.orders.find().exec() : Promise.resolve([]),
       ]);
 
-      const products = productDocs.map(d => d.toJSON());
-      const invoices = invoiceDocs.map(d => d.toJSON());
-      const debts = debtDocs.map(d => d.toJSON());
-      const purchases = purchaseDocs.map(d => d.toJSON());
+      const products = productDocs.map((d: any) => d.toJSON());
+      const invoices = invoiceDocs.map((d: any) => d.toJSON());
+      const debts = debtDocs.map((d: any) => d.toJSON());
+      const purchases = purchaseDocs.map((d: any) => d.toJSON());
+      const orders = (orderDocs || []).map((d: any) => d.toJSON ? d.toJSON() : d);
 
-      // Pre-calculate sales data
-      const productSalesMap: Record<string, { qty: number; profit: number }> = {};
+      // Pre-calculate sales data (Invoices + Customer Orders)
+      const productSalesMap: Record<string, { qty: number; profit: number; unit: string }> = {};
+      
+      // Track co-purchased items
+      const coPurchasesMap: Record<string, Record<string, number>> = {};
+
+      orders.forEach((ord: any) => {
+        const itemIds: string[] = [];
+        (ord.items || []).forEach((item: any) => {
+          const pId = item.product_id;
+          if (!pId) return;
+          itemIds.push(item.name || pId);
+          if (!productSalesMap[pId]) productSalesMap[pId] = { qty: 0, profit: 0, unit: item.unit || 'كرتونة' };
+          const q = Number(item.quantity) || 0;
+          const p = Number(item.sale_price) || 0;
+          const c = Number(item.actual_cost_price ?? item.cost_price) || 0;
+          productSalesMap[pId].qty += q;
+          productSalesMap[pId].profit += (p - c) * q;
+        });
+
+        // Record pair relations
+        for (let i = 0; i < itemIds.length; i++) {
+          for (let j = i + 1; j < itemIds.length; j++) {
+            const a = itemIds[i], b = itemIds[j];
+            if (!coPurchasesMap[a]) coPurchasesMap[a] = {};
+            coPurchasesMap[a][b] = (coPurchasesMap[a][b] || 0) + 1;
+          }
+        }
+      });
+
       invoices.forEach(inv => {
         (inv.items || []).forEach((item: any) => {
           const prod = products.find(p => p.id === item.product_id);
           const pId = prod ? prod.id : item.product_id;
           if (!pId) return;
-          if (!productSalesMap[pId]) productSalesMap[pId] = { qty: 0, profit: 0 };
+          if (!productSalesMap[pId]) productSalesMap[pId] = { qty: 0, profit: 0, unit: prod?.unit || 'كرتونة' };
           const q = Number(item.quantity) || 0;
           const p = Number(item.price) || 0;
           const c = prod ? (Number(prod.cost_price) || 0) : 0;

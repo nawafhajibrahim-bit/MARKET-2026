@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb, MessageCircle, Globe } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Package, Settings as SettingsIcon, HandCoins, FileText, LogOut, User, Store, ShieldCheck, Crown, X, Truck, Lightbulb, MessageCircle, Globe, ClipboardList } from 'lucide-react';
 import { WelcomeModal } from './WelcomeModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useDb } from '../database/Provider';
 
 export const Layout = () => {
   const { t, i18n } = useTranslation();
+  const isAr = i18n.language.startsWith('ar');
   const { currentUser, currentBranch, availableBranches, logout, isAdmin, switchBranch } = useAuth();
   const location = useLocation();
   const db = useDb();
@@ -102,9 +103,10 @@ export const Layout = () => {
   // Filter nav items based on role
   const allNavItems = [
     { path: '/', label: t('dashboard'), icon: LayoutDashboard, roles: ['admin', 'manager', 'cashier'] },
-    { path: '/pos', label: t('pos'), icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
-    { path: '/inventory', label: t('inventory'), icon: Package, roles: ['admin', 'manager'] },
-    { path: '/purchases', label: i18n.language.startsWith('ar') ? 'المشتريات' : 'Purchases', icon: Truck, roles: ['admin', 'manager'] },
+    { path: '/orders', label: isAr ? 'الطلبات' : 'Orders', icon: ClipboardList, roles: ['admin', 'manager', 'cashier'] },
+    { path: '/inventory', label: isAr ? 'المنتجات والأسعار' : t('inventory'), icon: Package, roles: ['admin', 'manager'] },
+    { path: '/suppliers', label: isAr ? 'موردو الجملة' : 'Suppliers', icon: Truck, roles: ['admin', 'manager'] },
+    { path: '/pos', label: isAr ? 'نقطة البيع' : t('pos'), icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
     { path: '/sales-history', label: t('sales_history'), icon: FileText, roles: ['admin', 'manager', 'cashier'] },
     { path: '/debts', label: t('debts_nav'), icon: HandCoins, roles: ['admin', 'manager', 'cashier'] },
     { path: '/settings', label: t('settings'), icon: SettingsIcon, roles: ['admin', 'manager'] },
@@ -168,7 +170,19 @@ export const Layout = () => {
           </nav>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Customer Store Front link */}
+          <a
+            href="/store"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer"
+            title={isAr ? "معاينة متجر الزبائن" : "Open Storefront"}
+          >
+            <Store size={15} />
+            <span className="hidden sm:inline">{isAr ? "متجر الزبائن ↗" : "Storefront ↗"}</span>
+          </a>
+
           {isTrial && isAdmin && (
             <button
               onClick={() => setShowUpgradeModal(true)}

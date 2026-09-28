@@ -3,7 +3,7 @@ import type { ExtractDocumentTypeFromTypedRxJsonSchema, RxJsonSchema } from 'rxd
 
 export const productSchemaLiteral = {
     title: 'product schema',
-    version: 1,
+    version: 2,
     primaryKey: 'id',
     type: 'object',
     properties: {
@@ -12,13 +12,20 @@ export const productSchemaLiteral = {
         sku_serial: { type: 'string' },
         name_ar: { type: 'string' },
         name_en: { type: 'string' },
+        description: { type: 'string' },
+        image: { type: 'string' },
         category: { type: 'string', maxLength: 100 },
         cost_price: { type: 'number' },
         sale_price: { type: 'number' },
+        discount_price: { type: 'number' },
+        badge: { type: 'string' },
         stock_quantity: { type: 'number' },
         min_safety_stock: { type: 'number' },
         expiry_date: { type: 'string' },
         unit: { type: 'string' },
+        is_available: { type: 'boolean' },
+        supplier_name: { type: 'string' },
+        supplier_id: { type: 'string' },
     },
     required: ['id', 'barcode', 'category', 'name_ar', 'cost_price', 'sale_price', 'stock_quantity', 'unit'],
     indexes: ['barcode', 'category'],
@@ -222,4 +229,76 @@ export const purchaseSchemaLiteral = {
 export const schemaTypedPurchase = toTypedRxJsonSchema(purchaseSchemaLiteral);
 export type PurchaseDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedPurchase>;
 export const purchaseSchema: RxJsonSchema<PurchaseDocType> = purchaseSchemaLiteral;
+ 
+// ───────────────────────────────────────────────
+// Order schema (Customer orders: Web & WhatsApp)
+// ───────────────────────────────────────────────
+export const orderSchemaLiteral = {
+    title: 'order schema',
+    version: 0,
+    primaryKey: 'order_id',
+    type: 'object',
+    properties: {
+        order_id: { type: 'string', maxLength: 100 },
+        order_number: { type: 'string', maxLength: 50 },
+        created_at: { type: 'string', maxLength: 100 },
+        customer_name: { type: 'string' },
+        customer_phone: { type: 'string' },
+        customer_address: { type: 'string' },
+        notes: { type: 'string' },
+        items: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    product_id: { type: 'string' },
+                    name: { type: 'string' },
+                    unit: { type: 'string' },
+                    quantity: { type: 'number' },
+                    sale_price: { type: 'number' },
+                    cost_price: { type: 'number' },
+                    actual_cost_price: { type: 'number' },
+                    subtotal: { type: 'number' },
+                },
+                required: ['product_id', 'name', 'unit', 'quantity', 'sale_price', 'cost_price', 'subtotal'],
+            },
+        },
+        total_amount: { type: 'number' },
+        estimated_cost: { type: 'number' },
+        actual_cost: { type: 'number' },
+        profit: { type: 'number' },
+        status: { type: 'string', maxLength: 50 }, // 'new' | 'confirmed' | 'purchased' | 'delivering' | 'completed' | 'cancelled'
+        order_source: { type: 'string', maxLength: 50 }, // 'web' | 'whatsapp'
+        supplier_notes: { type: 'string' },
+    },
+    required: ['order_id', 'order_number', 'created_at', 'customer_name', 'customer_phone', 'items', 'total_amount', 'status'],
+    indexes: ['created_at', 'status', 'order_number'],
+} as const;
+export const schemaTypedOrder = toTypedRxJsonSchema(orderSchemaLiteral);
+export type OrderDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedOrder>;
+export const orderSchema: RxJsonSchema<OrderDocType> = orderSchemaLiteral;
+
+// ───────────────────────────────────────────────
+// Supplier schema (موردو الجملة)
+// ───────────────────────────────────────────────
+export const supplierSchemaLiteral = {
+    title: 'supplier schema',
+    version: 0,
+    primaryKey: 'supplier_id',
+    type: 'object',
+    properties: {
+        supplier_id: { type: 'string', maxLength: 100 },
+        name: { type: 'string', maxLength: 100 },
+        phone: { type: 'string' },
+        whatsapp: { type: 'string' },
+        store_name: { type: 'string' },
+        notes: { type: 'string' },
+        created_at: { type: 'string' },
+    },
+    required: ['supplier_id', 'name'],
+    indexes: ['name'],
+} as const;
+export const schemaTypedSupplier = toTypedRxJsonSchema(supplierSchemaLiteral);
+export type SupplierDocType = ExtractDocumentTypeFromTypedRxJsonSchema<typeof schemaTypedSupplier>;
+export const supplierSchema: RxJsonSchema<SupplierDocType> = supplierSchemaLiteral;
 

@@ -15,7 +15,9 @@ import {
     systemConfigSchema,
     userSchema,
     branchSchema,
-    purchaseSchema
+    purchaseSchema,
+    orderSchema,
+    supplierSchema
 } from './schema';
 
 if (import.meta.env.DEV) {
@@ -92,7 +94,7 @@ export const initDB = async (): Promise<RxDatabase> => {
 
                             return cleaned;
                         } catch (err) {
-                            console.error('Error in products migration strategy:', err);
+                            console.error('Error in products migration strategy 1:', err);
                             return {
                                 id: String(oldDoc?.id || 'unknown'),
                                 barcode: String(oldDoc?.barcode || ''),
@@ -106,6 +108,30 @@ export const initDB = async (): Promise<RxDatabase> => {
                                 _rev: oldDoc?._rev,
                                 _meta: oldDoc?._meta,
                                 _attachments: oldDoc?._attachments
+                            };
+                        }
+                    },
+                    2: (oldDoc: any) => {
+                        try {
+                            const cleaned: any = { ...oldDoc };
+                            cleaned.image = typeof oldDoc?.image === 'string' ? oldDoc.image : '';
+                            cleaned.description = typeof oldDoc?.description === 'string' ? oldDoc.description : '';
+                            cleaned.is_available = oldDoc?.is_available !== false;
+                            cleaned.badge = typeof oldDoc?.badge === 'string' ? oldDoc.badge : '';
+                            cleaned.discount_price = Number(oldDoc?.discount_price) || 0;
+                            cleaned.supplier_name = typeof oldDoc?.supplier_name === 'string' ? oldDoc.supplier_name : '';
+                            cleaned.supplier_id = typeof oldDoc?.supplier_id === 'string' ? oldDoc.supplier_id : '';
+                            return cleaned;
+                        } catch {
+                            return {
+                                ...oldDoc,
+                                image: '',
+                                description: '',
+                                is_available: true,
+                                badge: '',
+                                discount_price: 0,
+                                supplier_name: '',
+                                supplier_id: ''
                             };
                         }
                     }
@@ -145,6 +171,14 @@ export const initDB = async (): Promise<RxDatabase> => {
             purchases: {
                 schema: purchaseSchema,
                 migrationStrategies: {}
+            },
+            orders: {
+                schema: orderSchema,
+                migrationStrategies: {}
+            },
+            suppliers: {
+                schema: supplierSchema,
+                migrationStrategies: {}
             }
         });
 
@@ -179,72 +213,107 @@ const seedDemoData = async (db: any) => {
                 {
                     id: "demo-prod-1",
                     barcode: "6281000000011",
-                    sku_serial: "SKU-MILK-01",
-                    name_ar: "حليب كامل الدسم 1 لتر",
-                    name_en: "Whole Milk 1L",
-                    category: "المواد الغذائية",
-                    cost_price: 1000,
-                    sale_price: 1500,
-                    stock_quantity: 50,
+                    sku_serial: "SKU-OIL-01",
+                    name_ar: "زيت طهي نقي (كرتونة)",
+                    name_en: "Pure Cooking Oil (Carton)",
+                    description: "كرتونة تحتوي على 12 عبوة سعة 1.5 لتر، جودة ممتازة للقلي والطهي",
+                    image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=500&q=80",
+                    category: "زيوت ودهون",
+                    cost_price: 18,
+                    sale_price: 20,
+                    discount_price: 0,
+                    badge: "سعر مميز",
+                    stock_quantity: 100,
                     min_safety_stock: 5,
-                    expiry_date: "2026-12-31",
-                    unit: "piece"
+                    expiry_date: "2027-12-31",
+                    unit: "كرتونة",
+                    is_available: true,
+                    supplier_name: "مخزن البركة للمواد الغذائية",
+                    supplier_id: "demo-supp-1"
                 },
                 {
                     id: "demo-prod-2",
                     barcode: "6281000000028",
                     sku_serial: "SKU-RICE-02",
-                    name_ar: "أرز بسمتي 5 كجم",
-                    name_en: "Basmati Rice 5kg",
-                    category: "المواد الغذائية",
-                    cost_price: 8000,
-                    sale_price: 11000,
-                    stock_quantity: 20,
+                    name_ar: "أرز بسمتي درجة أولى (صندوق 4 أكياس)",
+                    name_en: "Basmati Rice Box (4 Bags)",
+                    description: "صندوق أرز بسمتي هندي عنبر أصلي، 4 أكياس كل كيس 5 كجم",
+                    image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=500&q=80",
+                    category: "حبوب وأرز",
+                    cost_price: 36,
+                    sale_price: 42,
+                    discount_price: 39,
+                    badge: "عرض خاص",
+                    stock_quantity: 50,
                     min_safety_stock: 3,
-                    expiry_date: "2027-06-30",
-                    unit: "piece"
+                    expiry_date: "2028-06-30",
+                    unit: "صندوق",
+                    is_available: true,
+                    supplier_name: "مخزن البركة للمواد الغذائية",
+                    supplier_id: "demo-supp-1"
                 },
                 {
                     id: "demo-prod-3",
                     barcode: "6281000000035",
-                    sku_serial: "SKU-OIL-03",
-                    name_ar: "زيت طهي 1.5 لتر",
-                    name_en: "Cooking Oil 1.5L",
-                    category: "المواد الغذائية",
-                    cost_price: 3500,
-                    sale_price: 4500,
-                    stock_quantity: 30,
+                    sku_serial: "SKU-SUGAR-03",
+                    name_ar: "سكر ناعم ممتاز (كرتونة 10 كجم)",
+                    name_en: "Pure White Sugar (Carton 10kg)",
+                    description: "كرتونة سكر أبيض ناصع معبأ في 10 أكياس كل كيس 1 كجم",
+                    image: "https://images.unsplash.com/photo-1581441363689-1f3c3c414635?w=500&q=80",
+                    category: "مواد تموينية",
+                    cost_price: 11,
+                    sale_price: 13.5,
+                    discount_price: 0,
+                    badge: "",
+                    stock_quantity: 80,
                     min_safety_stock: 5,
-                    expiry_date: "2026-10-15",
-                    unit: "piece"
+                    expiry_date: "2028-10-15",
+                    unit: "كرتونة",
+                    is_available: true,
+                    supplier_name: "مخازن الأمانة للتوزيع",
+                    supplier_id: "demo-supp-2"
                 },
                 {
                     id: "demo-prod-4",
                     barcode: "6281000000042",
-                    sku_serial: "SKU-SHAMP-04",
-                    name_ar: "شامبو الشعر 400 مل",
-                    name_en: "Shampoo 400ml",
-                    category: "العناية الشخصية",
-                    cost_price: 2500,
-                    sale_price: 3750,
-                    stock_quantity: 15,
-                    min_safety_stock: 2,
-                    expiry_date: "2028-05-20",
-                    unit: "piece"
+                    sku_serial: "SKU-MILK-04",
+                    name_ar: "حليب طويل الأجل كامل الدسم (كرتونة)",
+                    name_en: "UHT Whole Milk (Carton)",
+                    description: "كرتونة حليب 12 عبوة سعة 1 لتر معقم عالي الجودة",
+                    image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=500&q=80",
+                    category: "ألبان ومشروبات",
+                    cost_price: 14,
+                    sale_price: 16.5,
+                    discount_price: 15.5,
+                    badge: "خصم",
+                    stock_quantity: 60,
+                    min_safety_stock: 5,
+                    expiry_date: "2027-04-20",
+                    unit: "كرتونة",
+                    is_available: true,
+                    supplier_name: "مخزن البركة للمواد الغذائية",
+                    supplier_id: "demo-supp-1"
                 },
                 {
                     id: "demo-prod-5",
                     barcode: "6281000000059",
-                    sku_serial: "SKU-SOAP-05",
-                    name_ar: "صابون سائل لليدين",
-                    name_en: "Liquid Hand Soap",
-                    category: "العناية الشخصية",
-                    cost_price: 1200,
-                    sale_price: 1800,
+                    sku_serial: "SKU-TEA-05",
+                    name_ar: "شاي سيلاني فاخر (باكيت 24 علبة)",
+                    name_en: "Ceylon Tea (Packet 24 boxes)",
+                    description: "باكيت شاي سيلاني نقي يحتوي على 24 علبة شاي 200 جم",
+                    image: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&q=80",
+                    category: "شاي وقهوة",
+                    cost_price: 25,
+                    sale_price: 30,
+                    discount_price: 0,
+                    badge: "",
                     stock_quantity: 40,
                     min_safety_stock: 4,
                     expiry_date: "2028-01-01",
-                    unit: "piece"
+                    unit: "باكيت",
+                    is_available: true,
+                    supplier_name: "مخازن الأمانة للتوزيع",
+                    supplier_id: "demo-supp-2"
                 }
             ];
 
@@ -255,18 +324,36 @@ const seedDemoData = async (db: any) => {
                 }
             }
 
-            const existingUnit = await db.units.findOne("demo-unit-1").exec();
-            if (!existingUnit) {
-                await db.units.insert({
-                    unit_id: "demo-unit-1",
-                    product_id: "demo-prod-1",
-                    unit_name: "كرتونة (12 علبة)",
-                    conversion_factor: 12,
-                    price_per_unit: 16000
-                }).catch(() => {});
+            // Seed demo suppliers
+            const demoSuppliers = [
+                {
+                    supplier_id: "demo-supp-1",
+                    name: "مخزن البركة للمواد الغذائية",
+                    phone: "+9647501234567",
+                    whatsapp: "+9647501234567",
+                    store_name: "البركة للتجارة",
+                    notes: "مورد زيوت وأرز وألبان - سرعة في تجهيز الطلبات",
+                    created_at: new Date().toISOString()
+                },
+                {
+                    supplier_id: "demo-supp-2",
+                    name: "مخازن الأمانة للتوزيع",
+                    phone: "+9647507654321",
+                    whatsapp: "+9647507654321",
+                    store_name: "الأمانة للمواد التموينية",
+                    notes: "مورد سكر وشاي ومعلبات - خصم على الكميات الكبيرة",
+                    created_at: new Date().toISOString()
+                }
+            ];
+
+            for (const supp of demoSuppliers) {
+                const existing = await db.suppliers.findOne(supp.supplier_id).exec();
+                if (!existing) {
+                    await db.suppliers.insert(supp).catch(() => {});
+                }
             }
 
-            console.log('Demo products and units seeded successfully!');
+            console.log('Demo products and suppliers seeded successfully!');
         }
     } catch (seedErr) {
         console.error('Failed to seed demo data', seedErr);
