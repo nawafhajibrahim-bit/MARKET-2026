@@ -10,12 +10,17 @@ interface StoreQRCodeModalProps {
 export const StoreQRCodeModal: React.FC<StoreQRCodeModalProps> = ({ isOpen, onClose }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [customOrigin, setCustomOrigin] = useState(() => localStorage.getItem('store_qr_origin') || (typeof window !== 'undefined' ? window.location.origin : ''));
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const storeUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/store`
-    : '/store';
+  const storeUrl = `${customOrigin}/store`;
   
   const shopName = localStorage.getItem('receipt_shop_name') || 'متجر ماركت 2026';
+
+  const handleSaveOrigin = (val: string) => {
+    setCustomOrigin(val);
+    localStorage.setItem('store_qr_origin', val);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -115,6 +120,30 @@ export const StoreQRCodeModal: React.FC<StoreQRCodeModalProps> = ({ isOpen, onCl
           >
             {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
           </button>
+        </div>
+
+        {/* Custom Origin Settings */}
+        <div className="mb-4 text-right">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-[10px] text-purple-600 hover:underline font-bold"
+          >
+            {showAdvanced ? 'إخفاء الإعدادات المتقدمة' : 'الإعدادات المتقدمة (للشبكة المحلية)'}
+          </button>
+          
+          {showAdvanced && (
+            <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+              <label className="block text-slate-500 mb-1">نطاق الشبكة (IP) أو الرابط الأساسي:</label>
+              <input 
+                type="text" 
+                value={customOrigin}
+                onChange={(e) => handleSaveOrigin(e.target.value)}
+                placeholder="مثال: http://192.168.1.5:5173"
+                dir="ltr"
+                className="w-full px-2 py-1.5 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 outline-none focus:border-purple-500 font-mono text-[10px]"
+              />
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
